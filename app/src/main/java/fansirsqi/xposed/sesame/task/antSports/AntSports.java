@@ -22,6 +22,7 @@ import fansirsqi.xposed.sesame.task.ModelTask;
 import fansirsqi.xposed.sesame.task.TaskCommon;
 import fansirsqi.xposed.sesame.util.Log;
 import fansirsqi.xposed.sesame.util.Maps.UserMap;
+import fansirsqi.xposed.sesame.util.MessageUtil;
 import fansirsqi.xposed.sesame.util.RandomUtil;
 import fansirsqi.xposed.sesame.util.ResUtil;
 import fansirsqi.xposed.sesame.data.Status;
@@ -48,6 +49,8 @@ public class AntSports extends ModelTask {
     private ChoiceModelField battleForFriendType;
     private SelectModelField originBossIdList;
     private BooleanModelField sportsTasks;
+    private BooleanModelField coinExchangeDoubleCard;
+
     @Override
     public String getName() {
         return "运动";
@@ -80,6 +83,7 @@ public class AntSports extends ModelTask {
         modelFields.addField(minExchangeCount = new IntegerModelField("minExchangeCount", "最小捐步步数", 0));
         modelFields.addField(latestExchangeTime = new IntegerModelField("latestExchangeTime", "最晚捐步时间(24小时制)", 22));
         modelFields.addField(syncStepCount = new IntegerModelField("syncStepCount", "自定义同步步数", 22000));
+        modelFields.addField(coinExchangeDoubleCard = new BooleanModelField("coinExchangeDoubleCard", "运动币兑换限时能量双击卡", false));
         return modelFields;
     }
     @Override
@@ -122,6 +126,9 @@ public class AntSports extends ModelTask {
     public void run() {
         Log.record("执行开始-" + getName());
         try {
+            if (coinExchangeDoubleCard.getValue()) {
+                coinExchangeItem("AMS2024032927086104");
+            }
             if (Status.canSyncStepToday(UserMap.getCurrentUid()) && TimeUtil.isNowAfterOrCompareTimeStr("0600")) {
                 addChildTask(new ChildModelTask("syncStep", () -> {
                     int step = tmpStepCount();
@@ -172,6 +179,34 @@ public class AntSports extends ModelTask {
             Log.record("执行结束-" + getName());
         }
     }
+
+    private void coinExchangeItem(String itemId) {
+        try {
+            JSONObject jo = new JSONObject(AntSportsRpcCall.queryItemDetail(itemId));
+            if (!MessageUtil.checkSuccess(TAG, jo)) {
+                return;
+            }
+            jo = jo.getJSONObject("data");
+            if (!"OK".equals(jo.optString("exchangeBtnStatus"))) {
+                return;
+            }
+            jo = jo.getJSONObject("itemBaseInfo");
+            String itemTitle = jo.getString("itemTitle");
+            int valueCoinCount = jo.getInt("valueCoinCount");
+            jo = new JSONObject(AntSportsRpcCall.exchangeItem(itemId, valueCoinCount));
+            if (!MessageUtil.checkSuccess(TAG, jo)) {
+                return;
+            }
+            jo = jo.getJSONObject("data");
+            if (jo.optBoolean("exgSuccess")) {
+                Log.other("运动好礼🎐兑换[" + itemTitle + "]花费" + valueCoinCount + "运动币");
+            }
+        } catch (Throwable t) {
+            Log.error(TAG, "trainMember err:");
+            Log.printStackTrace(TAG, t);
+        }
+    }
+
     public int tmpStepCount() {
         if (tmpStepCount >= 0) {
             return tmpStepCount;
