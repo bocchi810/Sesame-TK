@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 获取短 SHA
+      - name: Get short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::4}" >> $GITHUB_ENV
       # 设置时区为亚洲/上海
       - name: Set Timezone to Asia/Shanghai
         run: |
@@ -16,16 +19,25 @@ jobs:
           echo "Current time: $(date)"
 
       # 检出代码
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 设置JDK
       - name: Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          java-version: "21"
-          distribution: "temurin"
+          java-version: "23"
+          distribution: "zulu"
           cache: gradle
+
+      # 设置Gradle
+      - name: set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          gradle-version: wrapper
 
       # 获取原仓库的预发行版属性
       - name: Get Original Repository Pre-release Property
@@ -44,40 +56,40 @@ jobs:
 
       - name: Sign Normal APK
         id: sign_normal_apk
-        uses: ilharp/sign-android-release@v1
+        uses: ilharp/sign-android-release@v2
         with:
           releaseDir: app/build/outputs/apk/normal/release/
           signingKey: ${{ secrets.ANDROID_SIGNING_KEY }}
           keyAlias: ${{ secrets.ANDROID_KEY_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          buildToolsVersion: 34.0.0
+          buildToolsVersion: 36.0.0
 
       - name: Sign Compatible APK
         id: sign_compatible_apk
-        uses: ilharp/sign-android-release@v1
+        uses: ilharp/sign-android-release@v2
         with:
           releaseDir: app/build/outputs/apk/compatible/release/
           signingKey: ${{ secrets.ANDROID_SIGNING_KEY }}
           keyAlias: ${{ secrets.ANDROID_KEY_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          buildToolsVersion: 34.0.0
+          buildToolsVersion: 36.0.0
 
       - name: Generate APKS Checksum
         run: |
-          sha256sum ${{ steps.sign_normal_apk.outputs.signedFile  }} > CHECKSUMS-Sesame-Normal-${{ github.event.release.tag_name || github.ref_name }}.sha256
-          sha256sum ${{ steps.sign_compatible_apk.outputs.signedFile }} > CHECKSUMS-Sesame-Compatible-${{ github.event.release.tag_name || github.ref_name }}.sha256
+          sha256sum ${{ steps.sign_normal_apk.outputs.signedFile  }} > CHECKSUMS-Sesame-Normal-${{ github.event.release.tag_name || github.ref_name }}.${{ env.SHORT_SHA }}-signed.apk.sha256
+          sha256sum ${{ steps.sign_compatible_apk.outputs.signedFile }} > CHECKSUMS-Sesame-Compatible-${{ github.event.release.tag_name || github.ref_name }}.${{ env.SHORT_SHA }}-signed.apk.sha256
 
       - name: Upload Assets to Source Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Sesame-${{ github.event.release.tag_name || github.ref_name }} # 发布的名称。默认为标签名称
+          name: ${{ github.event.release.tag_name || github.ref_name }} # 发布的名称。默认为标签名称
           files: |
             ${{ steps.sign_normal_apk.outputs.signedFile }}
             ${{ steps.sign_compatible_apk.outputs.signedFile }}
-            CHECKSUMS-Sesame-Normal-${{ github.event.release.tag_name || github.ref_name }}.sha256
-            CHECKSUMS-Sesame-Compatible-${{ github.event.release.tag_name || github.ref_name }}.sha256
+            CHECKSUMS-Sesame-Normal-${{ github.event.release.tag_name || github.ref_name }}.${{ env.SHORT_SHA }}-signed.apk.sha256
+            CHECKSUMS-Sesame-Compatible-${{ github.event.release.tag_name || github.ref_name }}.${{ env.SHORT_SHA }}-signed.apk.sha256
           tag_name: ${{ github.ref_name }}
           draft: false
           append_body: true
@@ -93,12 +105,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           repository: Xposed-Modules-Repo/fansirsqi.xposed.sesame # 目标仓库的拥有者和仓库名称
-          name: Sesame-${{ github.event.release.tag_name || github.ref_name }} # 发布的名称。默认为标签名称
+          name: ${{ github.event.release.tag_name || github.ref_name }} # 发布的名称。默认为标签名称
           files: |
             ${{ steps.sign_normal_apk.outputs.signedFile }}
             ${{ steps.sign_compatible_apk.outputs.signedFile }}
-            CHECKSUMS-Sesame-Normal-${{ github.event.release.tag_name || github.ref_name }}.sha256
-            CHECKSUMS-Sesame-Compatible-${{ github.event.release.tag_name || github.ref_name }}.sha256
+            CHECKSUMS-Sesame-Normal-${{ github.event.release.tag_name || github.ref_name }}.${{ env.SHORT_SHA }}-signed.apk.sha256
+            CHECKSUMS-Sesame-Compatible-${{ github.event.release.tag_name || github.ref_name }}.${{ env.SHORT_SHA }}-signed.apk.sha256
           token: ${{ secrets.TARGET_REPO_PAT }}
           tag_name: ${{ github.ref_name }}
           draft: false
