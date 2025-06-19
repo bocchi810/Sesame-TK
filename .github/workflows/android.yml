@@ -1,5 +1,5 @@
 name: Android CI
-
+run-name: 📦 ALLG构建版本 ${{ github.ref_name }}
 on:
   push:
     branches: ["develop"]
