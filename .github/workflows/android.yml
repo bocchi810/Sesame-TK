@@ -1,5 +1,5 @@
 name: Android CI
-run-name: 📦 ${{ github.actor }}构建版本 ${{ github.ref_name }}
+run-name: 📦 ${{ github.actor }} @ ${{ env.ACTIVITYTimestamp }} @ 构建版本
 
 on:
   push:
@@ -123,12 +123,12 @@ jobs:
               echo "Commits:"; \
               git log --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}; \
             elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then \
-              echo "⚙️ Manual workflow run on ${{ github.ref_name }}"; \
+              echo "⚙️ Manual workflow run on ${{ github.ref_name }} by ${{ github.actor }}"; \
               echo ""; \
               echo "Latest commit:"; \
               git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
             else \
-              echo "ℹ️ Commit information for ${{ github.event_name }} event on ${{ github.ref_name }}:"; \
+              echo "ℹ️ Commit information for ${{ github.event_name }} event on ${{ github.ref_name }} by ${{ github.actor }}:"; \
               echo ""; \
               git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
             fi \
@@ -149,6 +149,7 @@ jobs:
               - Normal: `${{ steps.extract_info.outputs.normal_file }}`
               - Compatible: `${{ steps.extract_info.outputs.compatible_file }}`
             - Branch: `${{ github.ref_name }}`
+            - Triggered by: `${{ github.actor }}`
 
             *下载说明:*
               * Normal 为正常版本,适用于`Android 8.0`及以上的系统
@@ -178,7 +179,6 @@ jobs:
           echo "Creating tag: $VERSION_TAG"
           git tag "$VERSION_TAG"
           git push origin "$VERSION_TAG"
-
       - name: Upload Assets to Source Release
         uses: softprops/action-gh-release@v2
         with:
