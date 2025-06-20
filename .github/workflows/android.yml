@@ -1,5 +1,5 @@
 name: Android CI
-run-name: 📦 ${{ github.actor }}构建版本：${{ steps.extract_info.outputs.version }}
+run-name: 📦 ${{ github.actor }}构建版本：$(date)
 
 on:
   push:
