@@ -123,12 +123,12 @@ jobs:
               echo "Commits:"; \
               git log --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}; \
             elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then \
-              echo "⚙️ Manual workflow run on ${{ github.ref_name }} by ${{ github.actor }}"; \
+              echo "⚙️ Manual workflow run on ${{ github.ref_name }}"; \
               echo ""; \
               echo "Latest commit:"; \
               git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
             else \
-              echo "ℹ️ Commit information for ${{ github.event_name }} event on ${{ github.ref_name }} by ${{ github.actor }}:"; \
+              echo "ℹ️ Commit information for ${{ github.event_name }} event on ${{ github.ref_name }}:"; \
               echo ""; \
               git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
             fi \
@@ -149,7 +149,6 @@ jobs:
               - Normal: `${{ steps.extract_info.outputs.normal_file }}`
               - Compatible: `${{ steps.extract_info.outputs.compatible_file }}`
             - Branch: `${{ github.ref_name }}`
-            - Triggered by: `${{ github.actor }}`
 
             *下载说明:*
               * Normal 为正常版本,适用于`Android 8.0`及以上的系统
@@ -182,22 +181,4 @@ jobs:
       - name: Upload Assets to Source Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.event.release.tag_name || steps.extract_info.outputs.version }} # 发布的名称。默认为标签名称
-          files: |
-            ${{ steps.extract_apks.outputs.signed_compatible }}
-            ${{ steps.extract_apks.outputs.signed_normal }}
-            CHECKSUMS-Sesame-Normal-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
-            CHECKSUMS-Sesame-Compatible-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
-          tag_name: ${{ steps.extract_info.outputs.version}}
-          draft: false
-          append_body: true
-          generate_release_notes: true
-          body: |
-            ## ✨What's Changed
-
-            ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
-            > ## 下载说明
-              * Normal 为正常版本,适用于`Android 8.0`及以上的系统
-              * Compatible 为兼容版本,适用于`Android 7.0`及以下的系统,最低支持`Android 5.1`
-
-            > ~~墙内不再更新~~ 倒卖必死全家
+          name: ${
