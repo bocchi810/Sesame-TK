@@ -122,7 +122,7 @@ jobs:
               echo ""; \
               echo "Commits:"; \
               git log --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}; \
-            elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then \
+            elif [[ 这是一段测试文字 ]]; then \
               echo "⚙️ Manual workflow run on ${{ github.ref_name }} by ${{ github.actor }}"; \
               echo ""; \
               echo "Latest commit:"; \
