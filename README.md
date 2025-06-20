@@ -73,13 +73,13 @@
 <details> <summary>TG BOT配置教程</summary>   
 <h3>创建 Telegram Bot</h3>  
 
-- 私聊 @BotFather
-- 发送 /newbot 创建新 bot → 获取 TG_BOT_TOKEN
+- 私聊 ```@BotFather```
+- 发送 ```/newbot``` 创建新 bot → 获取 TG_BOT_TOKEN
 - 获取 Chat ID：
 - 将 bot 添加到群组/频道
-- 访问:https://api.telegram.org/bot<TG_BOT_TOKEN>/getUpdates
-- 例如:https://api.telegram.org/bot123456:abcdefg/getUpdates
-- 找到"sender_chat": {"id": -这是一串负数, 或者 "chat": {"id": -这是一串负数,
+- 访问:```https://api.telegram.org/bot<TG_BOT_TOKEN>/getUpdates```
+- 例如:```https://api.telegram.org/bot123456:abcdefg/getUpdates```
+- 找到```"sender_chat": {"id": -这是一串负数,``` 或者 ```"chat": {"id": -这是一串负数,```
 - 查找响应中的 "id" 字段 → 即 TG_CHAT_ID
 
 | TG变量名                      | 变量值                          |  
