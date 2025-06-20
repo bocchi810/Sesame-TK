@@ -207,6 +207,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
     implementation("androidx.compose.runtime:runtime-livedata")
 
+    implementation (libs.androidx.constraintlayout)
+
     implementation(libs.activity.compose)
 
     implementation(libs.core.ktx)

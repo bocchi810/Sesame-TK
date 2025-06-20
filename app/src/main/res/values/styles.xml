@@ -24,15 +24,20 @@
         <item name="android:colorBackground">@color/background</item>
     </style>
 
-    <style name="Widget.App.Button.MD3" parent="Widget.Material3.Button">
-        <item name="cornerRadius">8dp</item> <!-- 圆角 -->
+    <style name="Widget.App.Button.Main" parent="Widget.Material3.Button">
         <item name="android:textColor">@color/textColorPrimary</item>
-        <item name="backgroundTint">@color/background</item>
+        <item name="backgroundTint">@color/main_button</item>
+        <item name="rippleColor">@color/main_button_pressed</item>
+        <item name="iconTint">@null</item>
+        <item name="iconGravity">top</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="iconPadding">2dp</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="iconSize">36dp</item>
+        <item name="android:layout_width">113dp</item>
+        <item name="android:layout_height">wrap_content</item>
     </style>
 
-    <style name="TextAppearance.App.Body" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:textColor">?attr/colorOnSurface</item>
-        <item name="android:textSize">14sp</item>
-    </style>
 
 </resources>

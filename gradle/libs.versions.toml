@@ -2,6 +2,7 @@
 activity-compose = "1.10.1"
 
 android-plugin = "8.9.3"
+constraintlayout = "2.1.4"
 kotlin-plugin = "2.2.0-Beta2"
 kotlin-stdlib = "2.1.20"
 lifecycle-viewmodel-compose = "2.9.0"
@@ -25,6 +26,7 @@ ui-tooling-preview-android = "1.8.1"
 desugar = "2.1.5"
 [libraries]
 
+androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin-stdlib" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }

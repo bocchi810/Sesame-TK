@@ -11,7 +11,6 @@ import fansirsqi.xposed.sesame.entity.KVMap;
 import fansirsqi.xposed.sesame.model.ModelField;
 import fansirsqi.xposed.sesame.model.SelectModelFieldFunc;
 import fansirsqi.xposed.sesame.entity.MapperEntity;
-import fansirsqi.xposed.sesame.entity.KVMap;
 import fansirsqi.xposed.sesame.ui.widget.ListDialog;
 import java.util.List;
 import java.util.Objects;
@@ -39,7 +38,7 @@ public class SelectAndCountOneModelField extends ModelField<KVMap<String, Intege
         btn.setText(getName());
         btn.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         btn.setTextColor(ContextCompat.getColor(context, R.color.selection_color));
-        btn.setBackground(ContextCompat.getDrawable(context, R.drawable.button));
+        btn.setBackground(ContextCompat.getDrawable(context, R.drawable.dialog_list_button));
         btn.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         btn.setMinHeight(150);
         btn.setPaddingRelative(40, 0, 40, 0);

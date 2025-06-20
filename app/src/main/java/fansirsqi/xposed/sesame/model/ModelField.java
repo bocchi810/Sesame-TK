@@ -181,7 +181,7 @@ public class ModelField<T> implements Serializable {
         btn.setText(getName()); // 设置文本为字段名称
         btn.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)); // 设置布局参数
         btn.setTextColor(ContextCompat.getColor(context, R.color.selection_color)); // 设置文本颜色
-        btn.setBackground(ContextCompat.getDrawable(context, R.drawable.button));
+        btn.setBackground(ContextCompat.getDrawable(context, R.drawable.dialog_list_button));
         btn.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); // 设置文本对齐方式
         btn.setMinHeight(150); // 设置最小高度
         btn.setMaxHeight(180); // 设置最大高度

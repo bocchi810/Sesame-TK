@@ -227,11 +227,16 @@ public class AntFarmRpcCall {
         return RequestManager.requestString("com.alipay.antfarm.notifyFriend", args1);
     }
 
-    public static String feedFriendAnimal(String friendFarmId) {
-        String args1 = "[{\"animalType\":\"CHICK\",\"canMock\":true,\"friendFarmId\":\"" + friendFarmId +
-                "\",\"requestType\":\"NORMAL\",\"sceneCode\":\"ANTFARM\",\"source\":\"H5\",\"version\":\""
-                + VERSION + "\"}]";
-        return RequestManager.requestString("com.alipay.antfarm.feedFriendAnimal", args1);
+    public static String feedFriendAnimal(String friendFarmId) throws JSONException {
+//        [{"friendFarmId":"10171020124112012088822393935729","requestType":"NORMAL","sceneCode":"ANTFARM","source":"chInfo_ch_appcenter__chsub_9patch","version":"1.8.2302070202.46"}]
+        JSONObject args = new JSONObject();
+        args.put("friendFarmId", friendFarmId);
+        args.put("requestType", "NORMAL");
+        args.put("sceneCode", "ANTFARM");
+        args.put("source", "chInfo_ch_appcenter__chsub_9patch");
+        args.put("version", VERSION);
+        String params = "[" + args + "]";
+        return RequestManager.requestString("com.alipay.antfarm.feedFriendAnimal", params);
     }
 
     public static String farmId2UserId(String farmId) {

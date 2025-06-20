@@ -2,6 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/background"
     android:orientation="vertical">
 
     <include layout="@layout/base_title"/>
@@ -9,6 +10,7 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@color/background"
         android:paddingBottom="20dp">
 
         <fansirsqi.xposed.sesame.ui.MyWebView
@@ -16,6 +18,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_above="@id/pgb_webview"
+            android:background="@color/background"
             android:layout_marginBottom="32dp" />
 
         <ProgressBar

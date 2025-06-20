@@ -45,7 +45,6 @@ import java.util.concurrent.TimeUnit
 class MainActivity : BaseActivity() {
     private val TAG = "MainActivity"
     private var hasPermissions = false
-    private lateinit var tvStatistics: TextView
     private var userNameArray = arrayOf("默认")
     private var userEntityArray = arrayOf<UserEntity?>(null)
     private lateinit var oneWord: TextView
@@ -62,7 +61,6 @@ class MainActivity : BaseActivity() {
         }
         setContentView(R.layout.activity_main)
         val mainImage = findViewById<View>(R.id.main_image)
-        tvStatistics = findViewById(R.id.tv_statistics)
         val buildVersion = findViewById<TextView>(R.id.bulid_version)
         val buildTarget = findViewById<TextView>(R.id.bulid_target)
         oneWord = findViewById(R.id.one_word)
@@ -80,8 +78,6 @@ class MainActivity : BaseActivity() {
             Log.error(TAG, "load libSesame err:" + e.message)
         }
 
-
-
         mainImage?.setOnLongClickListener { v: View ->
             // 当视图被长按时执行的操作
             if (v.id == R.id.main_image) {
@@ -95,7 +91,6 @@ class MainActivity : BaseActivity() {
             }
             false // 如果不是目标视图，返回false
         }
-        tvStatistics.text = "🏗待施工.."
         FansirsqiUtil.getOneWord(
             object : OneWordCallback {
                 override fun onSuccess(result: String?) {

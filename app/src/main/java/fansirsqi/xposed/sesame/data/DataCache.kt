@@ -6,6 +6,7 @@ import fansirsqi.xposed.sesame.util.JsonUtil
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.RandomUtil
 import fansirsqi.xposed.sesame.util.StringUtil
+import fansirsqi.xposed.sesame.util.TimeUtil
 import java.io.File
 import java.io.IOException
 
@@ -35,12 +36,34 @@ object DataCache {
             Log.error(TAG, "Value for key '$key' cannot be null.")
             return false
         }
-        dataMap[key] = value
+
+        // 如果是 Set<String> 类型 → 转换为去重的 Set
+        if (value is Set<*>) {
+            val cleanedSet = value.mapNotNull { it as? String }
+                .map { it }
+                .filter { it.isNotEmpty() }
+                .toSet()
+            dataMap[key] = cleanedSet
+        }
+        // 如果是 List<String> 类型 → 去重 + trim
+        else if (value is List<*>) {
+            val cleanedList = value.mapNotNull { it as? String }
+                .map { it }
+                .distinct()
+                .filter { it.isNotEmpty() }
+            dataMap[key] = cleanedList
+        }
+        // 其他类型直接保存
+        else {
+            dataMap[key] = value
+        }
+
         return save()
     }
 
     @Suppress("UNCHECKED_CAST")
     fun <T> getData(key: String, defaultValue: T? = null): T? {
+        Log.runtime(TAG, "get data for key '$key'")
         return dataMap[key] as? T ?: defaultValue
     }
 
@@ -179,11 +202,9 @@ object DataCache {
     @Synchronized
     fun load(): Boolean {
         if (init) return true
-
         val oldFile = Files.getTargetFileofDir(Files.MAIN_DIR, FILENAME)
         val targetFile = Files.getTargetFileofDir(FILE_PATH, FILENAME)
         var success = false
-
         try {
             if (targetFile.exists()) {
                 val json = Files.readFromFile(targetFile)
@@ -228,15 +249,13 @@ object DataCache {
         return success
     }
 
-    @Synchronized
-    fun reset(targetFile: File?) {
+    fun unload() {
         try {
             JsonUtil.copyMapper().updateValue(this, DataCache)
-            Files.write2File(JsonUtil.formatJson(this), targetFile)
-            Log.runtime(TAG, "reset $TAG config success")
         } catch (e: Exception) {
-            Log.printStackTrace(TAG, e)
-            Log.error(TAG, "reset $TAG config failed")
+            Log.error(TAG, "unload ：${e.message}")
         }
     }
+
+
 }
