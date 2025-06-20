@@ -111,6 +111,9 @@ jobs:
       - name: Get Commit Details
         id: commit_details
         run: |
+          # 获取真实提交信息（排除自动生成的触发信息）
+          REAL_COMMIT_MSG=$(git log -1 --pretty=format:%s | grep -v "CI triggered by")
+          
           COMMIT_MESSAGE_BODY=$( \
             if [[ "${{ github.event_name }}" == "push" ]]; then \
               echo "🔨 $(git rev-list --count ${{ github.event.before }}..${{ github.event.after }}) new commits to ${{ github.repository }}:${{ github.ref_name }} ([compare view](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.event.after }}))"; \
@@ -122,14 +125,17 @@ jobs:
               echo "Commits:"; \
               git log --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}; \
             elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then \
-              echo "⚙️ Manual workflow run on ${{ github.ref_name }} by ${{ github.actor }}"; \
+              echo "⚙️ 手动触发工作流运行于 ${{ github.ref_name }} 分支"; \
+              echo "👤 操作者: ${{ github.actor }}"; \
               echo ""; \
-              echo "Latest commit:"; \
-              git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
+              if [ -n "$REAL_COMMIT_MSG" ]; then \
+                echo "最新提交:"; \
+                git log -1 --format="  %h ([查看提交](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
+              fi \
             else \
-              echo "ℹ️ Commit information for ${{ github.event_name }} event on ${{ github.ref_name }} by ${{ github.actor }}:"; \
+              echo "ℹ️ ${{ github.event_name }} 事件在 ${{ github.ref_name }} 分支上的提交信息:"; \
               echo ""; \
-              git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
+              git log -1 --format="  %h ([查看提交](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
             fi \
           )
           echo "COMMIT_MESSAGE_BODY<<EOF" >> $GITHUB_OUTPUT
@@ -142,19 +148,19 @@ jobs:
           to: ${{ secrets.TG_CHAT_ID }}
           token: ${{ secrets.TG_BOT_TOKEN }}
           message: |
-            📦 *New Version ${{ steps.extract_info.outputs.version }} Build!*
-
-            - Files: 
-              - Normal: `${{ steps.extract_info.outputs.normal_file }}`
-              - Compatible: `${{ steps.extract_info.outputs.compatible_file }}`
-            - Branch: `${{ github.ref_name }}`
-            - Triggered by: `${{ github.actor }}`
-
+            📦 *新版本 ${{ steps.extract_info.outputs.version }} 构建完成!*
+            
+            - 文件: 
+              - 标准版: `${{ steps.extract_info.outputs.normal_file }}`
+              - 兼容版: `${{ steps.extract_info.outputs.compatible_file }}`
+            - 分支: `${{ github.ref_name }}`
+            - 触发者: `${{ github.actor }}`
+            
             *下载说明:*
-              * Normal 为正常版本,适用于`Android 8.0`及以上的系统
-              * Compatible 为兼容版本,适用于`Android 7.0`及以下的系统,最低支持`Android 5.1`
-
-${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
+              * 标准版 适用于 `Android 8.0` 及以上的系统
+              * 兼容版 适用于 `Android 7.0` 及以下的系统, 最低支持 `Android 5.1`
+            
+            ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
           format: markdown
 
       - name: Send Normal APK
