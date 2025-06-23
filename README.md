@@ -42,7 +42,7 @@
 设置好这些后，去仓库新建一个release，随便新建一个tag，然后点击`Publish release`，GitHub Actions会自动编译并发布APK文件到release中，下载安装即可
 </details> 
 <details> 
-<summary>TARGET_REPO_PAT报错</summary>   
+<summary>GitHub Token/Pat报错</summary>   
 <h3>请在Sesame-TK/.github/workflows
 /android.yml文件中删除如下代码</h3>  
   
@@ -69,7 +69,77 @@
             ${{ github.event.release.body || '无更新说明' }}
   ```
 </details>  
+<details> <summary>Telegram报错一键解决方案</summary>   
+<h3>请在Sesame-TK/.github/workflows
+/android.yml文件中删除如下代码</h3>  
 
+  ```yaml
+- name: Send Combined Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TG_CHAT_ID }}
+          token: ${{ secrets.TG_BOT_TOKEN }}
+          message: |
+            📦 *New Version ${{ steps.extract_info.outputs.version }} Build!*
+
+            - Files: 
+              - Normal: `${{ steps.extract_info.outputs.normal_file }}`
+              - Compatible: `${{ steps.extract_info.outputs.compatible_file }}`
+            - Branch: `${{ github.ref_name }}`
+            - Triggered by: `${{ github.actor }}`
+
+            *下载说明:*
+              * Normal 为正常版本,适用于`Android 8.0`及以上的系统
+              * Compatible 为兼容版本,适用于`Android 7.0`及以下的系统,最低支持`Android 5.1`
+
+            ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
+          format: markdown
+
+      - name: Send Normal APK
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TG_CHAT_ID }}
+          token: ${{ secrets.TG_BOT_TOKEN }}
+          document: ${{ steps.extract_apks.outputs.signed_normal }}
+
+      - name: Send Compatible APK
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TG_CHAT_ID }}
+          token: ${{ secrets.TG_BOT_TOKEN }}
+          document: ${{ steps.extract_apks.outputs.signed_compatible }}
+
+      - name: Create Tag from Version
+        if: startsWith(github.ref, 'refs/heads/main') && github.event_name == 'push'
+        run: |
+          VERSION_TAG="v${{ steps.extract_info.outputs.version }}"
+          echo "Creating tag: $VERSION_TAG"
+          git tag "$VERSION_TAG"
+          git push origin "$VERSION_TAG"
+      - name: Upload Assets to Source Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.event.release.tag_name || steps.extract_info.outputs.version }} # 发布的名称。默认为标签名称
+          files: |
+            ${{ steps.extract_apks.outputs.signed_compatible }}
+            ${{ steps.extract_apks.outputs.signed_normal }}
+            CHECKSUMS-Sesame-Normal-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
+            CHECKSUMS-Sesame-Compatible-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
+          tag_name: ${{ steps.extract_info.outputs.version}}
+          draft: false
+          append_body: true
+          generate_release_notes: true
+          body: |
+            ## ✨What's Changed
+
+            ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
+            > ## 下载说明
+              * Normal 为正常版本,适用于`Android 8.0`及以上的系统
+              * Compatible 为兼容版本,适用于`Android 7.0`及以下的系统,最低支持`Android 5.1`
+
+            > ~~墙内不再更新~~ 倒卖必死全家
+```
+</details>
 <details> <summary>TG BOT配置教程</summary>   
 <h3>创建 Telegram Bot</h3>  
 
