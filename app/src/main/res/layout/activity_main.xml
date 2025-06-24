@@ -74,6 +74,21 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/bulid_target" />
+    
+     <!-- 与官版做区分 -->
+     <TextView
+        android:id="@+id/build_author"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="sans-serif-smallcaps"
+        android:gravity="center"
+        android:text="ALLG编译，与原版保持一致。"
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textSize="14sp"
+        app:layout_constraintTop_toBottomOf="@id/bulid_version"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 
     <androidx.constraintlayout.widget.ConstraintLayout
