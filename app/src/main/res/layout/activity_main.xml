@@ -83,19 +83,35 @@
         android:layout_marginTop="12dp"
         android:fontFamily="sans-serif-smallcaps"
         android:gravity="center"
-        android:text="ALLG编译，与原版保持一致。"
+        android:text="ALLG编译，与原版保持一致。👑"
+        android:textColor="#FFD700"
         android:textAppearance="@style/TextAppearance.Material3.BodySmall"
         android:textSize="14sp"
         app:layout_constraintTop_toBottomOf="@id/bulid_version"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-
-
+    
+     <!-- 官方声明 -->
+     <TextView
+        android:id="@+id/message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="sans-serif-smallcaps"
+        android:gravity="center"
+        android:text="本APP是为了学习研究而开发，免费开源，禁止用于任何商业用途，并禁止二次修改后闭源发布。\n请于24小时内卸载本APP。\n如果您是通过购买获得，请联系卖家退款或在平台举报卖家。⚠️"
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textSize="14sp"
+        android:textColor="@android:color/holo_red_dark"
+        app:layout_constraintTop_toBottomOf="@id/build_author"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+    
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottom_button_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="48dp"
+        android:layout_marginBottom="32dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent">
