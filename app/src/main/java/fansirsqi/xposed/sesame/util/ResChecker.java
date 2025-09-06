@@ -15,7 +15,6 @@ public class ResChecker {
             if (jo.optBoolean("success") || jo.optBoolean("isSuccess")) {
                 return true;
             }
-
             // 检查 resultCode
             Object resCode = jo.opt("resultCode");
             if (resCode != null) {
@@ -26,7 +25,6 @@ public class ResChecker {
                     return true;
                 }
             }
-
             // 检查 memo 字段
             if ("SUCCESS".equalsIgnoreCase(jo.optString("memo", ""))) {
                 return true;
