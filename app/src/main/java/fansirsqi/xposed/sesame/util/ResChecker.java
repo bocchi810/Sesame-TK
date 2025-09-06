@@ -30,7 +30,18 @@ public class ResChecker {
                 return true;
             }
 
-            Log.error(TAG, "Check failed: " + jo);
+            // 获取调用栈信息以确定错误来源
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            String callerInfo = "";
+            // 寻找第一个非ResChecker类的调用者（真正的业务代码调用位置）
+            for (int i = 1; i < stackTrace.length; i++) {
+                StackTraceElement element = stackTrace[i];
+                if (!element.getClassName().contains("ResChecker")) {
+                    callerInfo = element.getClassName() + "." + element.getMethodName() + ":" + element.getLineNumber();
+                    break;
+                }
+            }
+            Log.error(TAG, "Check failed: [来源: " + callerInfo + "] " + jo);
             return false;
 
         } catch (Throwable t) {
