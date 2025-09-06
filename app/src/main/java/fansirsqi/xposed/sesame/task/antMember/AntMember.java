@@ -338,12 +338,26 @@ public class AntMember extends ModelTask {
         Log.error(TAG + ".doAllAvailableSesameTask.queryAvailableSesameTask", "芝麻信用💳[查询任务响应失败]#" + s);
         return;
       }
+
       JSONObject taskObj = jo.getJSONObject("data");
+      Log.record(TAG, "芝麻信用💳[任务数据]#" + taskObj);
       if (taskObj.has("dailyTaskListVO")) {
-        joinAndFinishSesameTask(taskObj.getJSONObject("dailyTaskListVO").getJSONArray("waitCompleteTaskVOS"));
-        joinAndFinishSesameTask(taskObj.getJSONObject("dailyTaskListVO").getJSONArray("waitJoinTaskVOS"));
+        JSONObject dailyTaskListVO = taskObj.getJSONObject("dailyTaskListVO");
+       // Log.record(TAG, "芝麻信用💳[日常任务列表]#" + dailyTaskListVO);
+
+        if (dailyTaskListVO.has("waitCompleteTaskVOS")) {
+          Log.record(TAG, "芝麻信用💳[待完成任务]#开始处理");
+          joinAndFinishSesameTask(dailyTaskListVO.getJSONArray("waitCompleteTaskVOS"));
+        }
+        
+        if (dailyTaskListVO.has("waitJoinTaskVOS")) {
+          Log.record(TAG, "芝麻信用💳[待加入任务]#开始处理");
+          joinAndFinishSesameTask(dailyTaskListVO.getJSONArray("waitJoinTaskVOS"));
+        }
       }
+      
       if (taskObj.has("toCompleteVOS")) {
+        Log.record(TAG, "芝麻信用💳[toCompleteVOS任务]#开始处理");
         joinAndFinishSesameTask(taskObj.getJSONArray("toCompleteVOS"));
       }
     } catch (Throwable t) {
@@ -356,11 +370,23 @@ public class AntMember extends ModelTask {
    * @throws JSONException JSON解析异常，上抛处理
    */
   private static void joinAndFinishSesameTask(JSONArray taskList) throws JSONException {
+    try {
+      Log.record(TAG, "芝麻信用💳[任务列表]#" + taskList.toString());
+    } catch (Throwable t) {
+      Log.printStackTrace(TAG + ".joinAndFinishSesameTask", t);
+    }
+    
     for (int i = 0; i < taskList.length(); i++) {
       JSONObject task = taskList.getJSONObject(i);
+      // 添加检查，确保templateId存在
+      if (!task.has("templateId")) {
+        String taskTitle = task.has("title") ? task.getString("title") : "未知任务";
+        Log.error(TAG, "芝麻信用💳[任务缺少templateId字段]#任务标题:" + taskTitle);
+        continue;  // 跳过这个任务
+      }
       String taskTemplateId = task.getString("templateId");
-      String taskTitle = task.getString("title");
-      int needCompleteNum = task.getInt("needCompleteNum");
+      String taskTitle = task.has("title") ? task.getString("title") : "未知任务";
+      int needCompleteNum = task.has("needCompleteNum") ? task.getInt("needCompleteNum") : 1;
       int completedNum = task.optInt("completedNum", 0);
       String s;
       String recordId;
@@ -374,8 +400,9 @@ public class AntMember extends ModelTask {
           continue;
       }
 
-      if (task.getString("actionUrl").contains("jumpAction")) {
+      if (task.has("actionUrl") && task.getString("actionUrl").contains("jumpAction")) {
         // 跳转APP任务 依赖跳转的APP发送请求鉴别任务完成 仅靠hook支付宝无法完成
+        Log.record(TAG, "芝麻信用💳[跳过跳转APP任务]#" + taskTitle);
         continue;
       }
       if (!task.has("todayFinish")) {
@@ -407,7 +434,7 @@ public class AntMember extends ModelTask {
       }
 
       // 是否为浏览15s任务
-      boolean assistiveTouch = task.getJSONObject("strategyRule").optBoolean("assistiveTouch");
+      boolean assistiveTouch = task.has("strategyRule") && task.getJSONObject("strategyRule").optBoolean("assistiveTouch");
       if (task.optBoolean("jumpToPushModel") || assistiveTouch) {
         s = AntMemberRpcCall.finishSesameTask(recordId);
         GlobalThreadPools.sleep(16000);
@@ -890,19 +917,29 @@ public class AntMember extends ModelTask {
   }
   private void beanSignIn() {
     try {
-      JSONObject jo = new JSONObject(AntMemberRpcCall.querySignInProcess("AP16242232", "INS_BLUE_BEAN_SIGN"));
-      if (!jo.optBoolean("success")) {
-        Log.runtime(jo.toString());
-        return;
-      }
-      if (jo.getJSONObject("result").getBoolean("canPush")) {
-        jo = new JSONObject(AntMemberRpcCall.signInTrigger("AP16242232", "INS_BLUE_BEAN_SIGN"));
-        if (jo.optBoolean("success")) {
-          String prizeName = jo.getJSONObject("result").getJSONArray("prizeSendOrderDTOList").getJSONObject(0).getString("prizeName");
-          Log.record(TAG,"安心豆🫘[" + prizeName + "]");
-        } else {
+      try {
+        String signInProcessStr = AntMemberRpcCall.querySignInProcess("AP16242232", "INS_BLUE_BEAN_SIGN");
+
+          JSONObject jo = new JSONObject(signInProcessStr);
+        if (!jo.optBoolean("success")) {
           Log.runtime(jo.toString());
+          return;
         }
+        
+        if (jo.getJSONObject("result").getBoolean("canPush")) {
+          String signInTriggerStr = AntMemberRpcCall.signInTrigger("AP16242232", "INS_BLUE_BEAN_SIGN");
+
+            jo = new JSONObject(signInTriggerStr);
+          if (jo.optBoolean("success")) {
+            String prizeName = jo.getJSONObject("result").getJSONArray("prizeSendOrderDTOList").getJSONObject(0).getString("prizeName");
+            Log.record(TAG,"安心豆🫘[" + prizeName + "]");
+          } else {
+            Log.runtime(jo.toString());
+          }
+        }
+      } catch (NullPointerException e) {
+        Log.error(TAG, "安心豆🫘[RPC桥接失败]#可能是RpcBridge未初始化");
+        Log.printStackTrace(TAG, e);
       }
     } catch (Throwable t) {
       Log.runtime(TAG, "beanSignIn err:");
@@ -911,30 +948,48 @@ public class AntMember extends ModelTask {
   }
   private void beanExchangeBubbleBoost() {
     try {
-      JSONObject jo = new JSONObject(AntMemberRpcCall.queryUserAccountInfo("INS_BLUE_BEAN"));
-      if (!jo.optBoolean("success")) {
-        Log.runtime(jo.toString());
-        return;
-      }
-      int userCurrentPoint = jo.getJSONObject("result").getInt("userCurrentPoint");
-      jo = new JSONObject(AntMemberRpcCall.beanExchangeDetail("IT20230214000700069722"));
-      if (!jo.optBoolean("success")) {
-        Log.runtime(jo.toString());
-        return;
-      }
-      jo = jo.getJSONObject("result").getJSONObject("rspContext").getJSONObject("params").getJSONObject("exchangeDetail");
-      String itemId = jo.getString("itemId");
-      String itemName = jo.getString("itemName");
-      jo = jo.getJSONObject("itemExchangeConsultDTO");
-      int realConsumePointAmount = jo.getInt("realConsumePointAmount");
-      if (!jo.getBoolean("canExchange") || realConsumePointAmount > userCurrentPoint) {
-        return;
-      }
-      jo = new JSONObject(AntMemberRpcCall.beanExchange(itemId, realConsumePointAmount));
-      if (jo.optBoolean("success")) {
-        Log.record(TAG,"安心豆🫘[兑换:" + itemName + "]");
-      } else {
-        Log.runtime(jo.toString());
+      // 检查RPC调用是否可用
+      try {
+        String accountInfo = AntMemberRpcCall.queryUserAccountInfo("INS_BLUE_BEAN");
+
+          JSONObject jo = new JSONObject(accountInfo);
+        if (!jo.optBoolean("success")) {
+          Log.runtime(jo.toString());
+          return;
+        }
+        
+        int userCurrentPoint = jo.getJSONObject("result").getInt("userCurrentPoint");
+        
+        // 检查beanExchangeDetail调用
+        String exchangeDetailStr = AntMemberRpcCall.beanExchangeDetail("IT20230214000700069722");
+
+          jo = new JSONObject(exchangeDetailStr);
+        if (!jo.optBoolean("success")) {
+          Log.runtime(jo.toString());
+          return;
+        }
+        
+        jo = jo.getJSONObject("result").getJSONObject("rspContext").getJSONObject("params").getJSONObject("exchangeDetail");
+        String itemId = jo.getString("itemId");
+        String itemName = jo.getString("itemName");
+        jo = jo.getJSONObject("itemExchangeConsultDTO");
+        int realConsumePointAmount = jo.getInt("realConsumePointAmount");
+        
+        if (!jo.getBoolean("canExchange") || realConsumePointAmount > userCurrentPoint) {
+          return;
+        }
+        
+        String exchangeResult = AntMemberRpcCall.beanExchange(itemId, realConsumePointAmount);
+
+          jo = new JSONObject(exchangeResult);
+        if (jo.optBoolean("success")) {
+          Log.record(TAG,"安心豆🫘[兑换:" + itemName + "]");
+        } else {
+          Log.runtime(jo.toString());
+        }
+      } catch (NullPointerException e) {
+        Log.error(TAG, "安心豆🫘[RPC桥接失败]#可能是RpcBridge未初始化");
+        Log.printStackTrace(TAG, e);
       }
     } catch (Throwable t) {
       Log.runtime(TAG, "beanExchangeBubbleBoost err:");
