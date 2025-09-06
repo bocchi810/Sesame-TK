@@ -1,5 +1,5 @@
-name: 📦构建027官方版本
-run-name: 📦 ${{ github.actor }} @ 构建027魔改版本
+name: 📦构建027官改版本
+run-name: 📦 ${{ github.actor }} @ 构建027官改版本
 
 on:
   workflow_dispatch:
@@ -137,7 +137,7 @@ jobs:
           to: ${{ secrets.TG_CHAT_ID }}
           token: ${{ secrets.TG_BOT_TOKEN }}
           message: |
-            📦 *0.2.7魔改版本 ${{ steps.extract_info.outputs.version }} Build!*
+            📦 *0.2.7官改版本 ${{ steps.extract_info.outputs.version }} Build!*
 
             ```
             下载说明:
@@ -182,7 +182,7 @@ jobs:
           append_body: true
           generate_release_notes: true
           body: |
-            ## ✨027版本更新了啥？
+            ## ✨027官改版本更新了啥？
 
             ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
             > ## 下载说明
