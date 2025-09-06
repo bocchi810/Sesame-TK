@@ -340,7 +340,7 @@ public class AntMember extends ModelTask {
       }
 
       JSONObject taskObj = jo.getJSONObject("data");
-      Log.record(TAG, "芝麻信用💳[任务数据]#" + taskObj);
+      //Log.record(TAG, "芝麻信用💳[任务数据]#" + taskObj);
       if (taskObj.has("dailyTaskListVO")) {
         JSONObject dailyTaskListVO = taskObj.getJSONObject("dailyTaskListVO");
        // Log.record(TAG, "芝麻信用💳[日常任务列表]#" + dailyTaskListVO);
@@ -371,7 +371,7 @@ public class AntMember extends ModelTask {
    */
   private static void joinAndFinishSesameTask(JSONArray taskList) throws JSONException {
     try {
-      Log.record(TAG, "芝麻信用💳[任务列表]#" + taskList.toString());
+     // Log.record(TAG, "芝麻信用💳[任务列表]#" + taskList.toString());
     } catch (Throwable t) {
       Log.printStackTrace(TAG + ".joinAndFinishSesameTask", t);
     }

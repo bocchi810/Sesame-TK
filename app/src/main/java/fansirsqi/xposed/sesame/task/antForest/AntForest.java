@@ -59,6 +59,7 @@ import fansirsqi.xposed.sesame.util.Average;
 import fansirsqi.xposed.sesame.util.GlobalThreadPools;
 import fansirsqi.xposed.sesame.util.ListUtil;
 import fansirsqi.xposed.sesame.util.Log;
+import fansirsqi.xposed.sesame.util.StringUtil;
 import fansirsqi.xposed.sesame.util.maps.UserMap;
 import fansirsqi.xposed.sesame.util.Notify;
 import fansirsqi.xposed.sesame.util.RandomUtil;
@@ -358,8 +359,9 @@ public class AntForest extends ModelTask {
             taskCount.set(0);
             selfId = UserMap.getCurrentUid();
             usePropBeforeCollectEnergy(selfId);
-            collectPKEnergy();
+
             collectFriendEnergy();// 优先收取好友能量
+            collectPKEnergy();
             JSONObject selfHomeObj = querySelfHome();
             selfHomeObj = collectEnergy(UserMap.getCurrentUid(), selfHomeObj, "self"); //收取自己的能量
 
@@ -1043,12 +1045,12 @@ public class AntForest extends ModelTask {
                     if (Objects.equals(userId, selfId)) continue; //如果是自己则跳过
                     pkIdList.add(userId);
                     if (pkIdList.size() == 20) {
-                        processLastdEnergy(pkIdList, "pk");//20个id 一次处理
+                        processLastEnergy(pkIdList, "pk");//20个id 一次处理
                         pkIdList.clear();
                     }
                 }
                 if (!pkIdList.isEmpty()) {
-                    processLastdEnergy(pkIdList, "pk");
+                    processLastEnergy(pkIdList, "pk");
                 }
                 Log.runtime(TAG, "收取PK能量完成！");
             }
@@ -1058,36 +1060,78 @@ public class AntForest extends ModelTask {
     }
 
 
+    /**
+     * 收集好友排行榜中的能量
+     * <p>
+     * 该方法首先获取好友排行榜，然后分批处理好友的能量：
+     * 1. 先处理排名前20的好友
+     * 2. 再分批处理剩余好友（每批20个）
+     * 3. 包含重试机制，最多尝试3次，每次重试间隔3秒
+     * </p>
+     */
     private void collectFriendEnergy() {
         try {
-            JSONObject friendsObject = new JSONObject(AntForestRpcCall.queryFriendsEnergyRanking());
-            if (!ResChecker.checkRes(TAG + "获取好友排行榜失败:", friendsObject)) {
-                Log.error(TAG, "获取好友排行榜失败: " + friendsObject.optString("resultDesc"));
+            // 添加重试机制，最多尝试3次
+            String rankingResponse = null;
+            JSONObject friendsObject = null;
+            boolean success = false;
+            
+            for (int retry = 0; retry < 3 && !success; retry++) {
+                if (retry > 0) {
+                    Log.record(TAG, "获取好友排行榜第" + (retry + 1) + "次尝试");
+                    // 重试前等待一段时间
+                    GlobalThreadPools.sleep(3000);
+                }
+                
+                rankingResponse = AntForestRpcCall.queryFriendsEnergyRanking();
+                if (StringUtil.isEmpty(rankingResponse)) {
+                    Log.error(TAG, "获取好友排行榜返回为空，准备重试");
+                    continue;
+                }
+                
+                try {
+                    friendsObject = new JSONObject(rankingResponse);
+                    if (ResChecker.checkRes(TAG + "获取好友排行榜失败:", friendsObject)) {
+                        success = true;
+                        Log.record(TAG, "成功获取好友排行榜");
+                    } else {
+                        String errorMsg = friendsObject.optString("errorMessage", "未知错误");
+                        Log.error(TAG, "获取好友排行榜失败: " + errorMsg + "，准备重试");
+                    }
+                } catch (JSONException e) {
+                    Log.error(TAG, "解析好友排行榜JSON异常，准备重试: " + e.getMessage());
+                }
+            }
+            
+            if (!success) {
+                Log.error(TAG, "获取好友排行榜失败，已重试3次，放弃");
                 return;
             }
             // 处理排名靠前的好友（通常自己也在其中） 20个
+            Log.record(TAG, "开始处理排名靠前好友");
             collectUserEnergy(friendsObject, "");
             // 分批处理其他好友（从第20位开始）
-            JSONArray totalDatas = friendsObject.optJSONArray("totalDatas");
-            if (totalDatas == null || totalDatas.length() == 0) {
-                Log.runtime(TAG, "好友排行榜为空，跳过");
+            JSONArray totalData = friendsObject.optJSONArray("totalDatas");
+            if (totalData == null || totalData.length() == 0) {
+                Log.record(TAG, "好友排行榜为空，跳过");
                 return;
             }
+            Log.record(TAG, "开始处理其他好友，共" + totalData.length() + "个");
             List<String> idList = new ArrayList<>();
-            for (int pos = 20; pos < totalDatas.length(); pos++) {
-                JSONObject friend = totalDatas.getJSONObject(pos);
+            for (int pos = 20; pos < totalData.length(); pos++) {
+                JSONObject friend = totalData.getJSONObject(pos);
                 String userId = friend.getString("userId");
                 if (Objects.equals(userId, selfId)) continue; //如果是自己则跳过
                 idList.add(userId);
                 if (idList.size() == 20) {
-                    processLastdEnergy(idList, "");//20个id 一次处理
+                    processLastEnergy(idList, "");//20个id 一次处理
                     idList.clear();
                 }
             }
             if (!idList.isEmpty()) {
-                processLastdEnergy(idList, "");
+                processLastEnergy(idList, "");
             }
-            Log.runtime(TAG, "收取好友能量完成！");
+            Log.record(TAG, "收取好友能量完成！");
         } catch (JSONException e) {
             Log.printStackTrace(TAG, "解析好友排行榜 JSON 异常", e);
         } catch (Throwable t) {
@@ -1098,21 +1142,63 @@ public class AntForest extends ModelTask {
 
     /**
      * 收取排名靠后的能量
+     * <p>
+     * 该方法处理一批用户的能量收集：
+     * 1. 调用fillUserRobFlag API获取用户能量信息
+     * 2. 遍历每个用户并处理其能量
+     * 3. 包含重试机制，最多尝试3次，每次重试间隔2秒
+     * </p>
      *
-     * @param userIds 用户id列表
+     * @param userIds 用户id列表（最多20个）
+     * @param flag 标志，"pk"表示PK榜好友，""表示普通好友
      */
-    private void processLastdEnergy(List<String> userIds, String flag) {
+    private void processLastEnergy(List<String> userIds, String flag) {
         try {
             if (errorWait) return;
-            String jsonStr;
-            if (flag.equals("pk")) {
-                jsonStr = AntForestRpcCall.fillUserRobFlag(new JSONArray(userIds), true);
-            } else {
-                jsonStr = AntForestRpcCall.fillUserRobFlag(new JSONArray(userIds));
+            
+            // 添加重试机制，最多尝试3次
+            String jsonStr = null;
+            JSONObject batchObj = null;
+            boolean success = false;
+            
+            for (int retry = 0; retry < 3 && !success; retry++) {
+                if (retry > 0) {
+                    Log.record(TAG, "获取好友能量信息第" + (retry + 1) + "次尝试");
+                    // 重试前等待一段时间
+                    GlobalThreadPools.sleep(2000);
+                }
+                
+                try {
+                    if (flag.equals("pk")) {
+                        jsonStr = AntForestRpcCall.fillUserRobFlag(new JSONArray(userIds), true);
+                    } else {
+                        jsonStr = AntForestRpcCall.fillUserRobFlag(new JSONArray(userIds));
+                    }
+                    
+                    if (StringUtil.isEmpty(jsonStr)) {
+                        Log.error(TAG, "获取好友能量信息返回为空，准备重试");
+                        continue;
+                    }
+                    
+                    batchObj = new JSONObject(jsonStr);
+                    success = true;
+                } catch (Exception e) {
+                    Log.error(TAG, "获取好友能量信息异常，准备重试: " + e.getMessage());
+                }
             }
-            JSONObject batchObj = new JSONObject(jsonStr);
+            
+            if (!success) {
+                Log.error(TAG, "获取好友能量信息失败，已重试3次，放弃");
+                return;
+            }
+            
             JSONArray friendList = batchObj.optJSONArray("friendRanking");
-            if (friendList == null) return;
+            if (friendList == null) {
+                Log.record(TAG, "好友能量列表为空");
+                return;
+            }
+            
+            Log.record(TAG, "开始处理" + friendList.length() + "个好友的能量");
             for (int i = 0; i < friendList.length(); i++) {
                 JSONObject friendObj = friendList.getJSONObject(i);
                 processEnergy(friendObj, flag);
@@ -1126,9 +1212,15 @@ public class AntForest extends ModelTask {
 
     /**
      * 处理单个好友 - 收能量
-     * 最终判断是否收能量步骤
+     * <p>
+     * 该方法是能量收集的最终决策点，根据不同条件判断是否需要收取能量：
+     * 1. 区分普通好友和PK好友的处理逻辑
+     * 2. 检查是否需要收集能量、帮助保护或领取礼盒
+     * 3. 根据条件调用相应的方法执行具体操作
+     * </p>
      *
-     * @param obj 好友/PK好友 的JSON对象
+     * @param obj 好友/PK好友的JSON对象，包含能量信息
+     * @param flag 标志，"pk"表示PK榜好友，""表示普通好友
      */
     private void processEnergy(JSONObject obj, String flag) {
         try {

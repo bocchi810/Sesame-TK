@@ -33,14 +33,29 @@ public class ResChecker {
             // 获取调用栈信息以确定错误来源
             StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
             String callerInfo = "";
-            // 寻找第一个非ResChecker类的调用者（真正的业务代码调用位置）
-            for (int i = 1; i < stackTrace.length; i++) {
+            
+            // 寻找第一个非ResChecker类且非Java系统类的调用者（真正的业务代码调用位置）
+            for (int i = 0; i < stackTrace.length; i++) {
                 StackTraceElement element = stackTrace[i];
-                if (!element.getClassName().contains("ResChecker")) {
-                    callerInfo = element.getClassName() + "." + element.getMethodName() + ":" + element.getLineNumber();
+                String className = element.getClassName();
+                
+                // 跳过ResChecker类和Java系统类
+                if (!className.contains("ResChecker") && 
+                    !className.startsWith("java.lang.") && 
+                    !className.startsWith("java.util.") &&
+                    className.contains("fansirsqi.xposed.sesame")) {
+                    
+                    // 获取简化的类名（不含包名）
+                    String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
+                    callerInfo = simpleClassName + "." + element.getMethodName() + ":" + element.getLineNumber();
                     break;
                 }
             }
+            
+            if (callerInfo.isEmpty()) {
+                callerInfo = "未知来源";
+            }
+            
             Log.error(TAG, "Check failed: [来源: " + callerInfo + "] " + jo);
             return false;
 
