@@ -1713,7 +1713,8 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                     // 等待成熟的能量球，添加到蹲点队列
                     val produceTime = bubble.optLong("produceTime", 0L)
                     if (produceTime > 0 && produceTime > serverTime) {
-                        // 检查保护罩时间：如果保护罩覆盖整个成熟期，跳过蹲点
+                        // 检查保护罩时间（仅好友）：如果保护罩覆盖整个成熟期，跳过蹲点
+                        // 自己的账号：无论是否有保护罩都要添加蹲点（到时间后直接收取）
                         if (!isSelf && shouldSkipWaitingTaskDueToProtection(userHomeObj, produceTime, serverTime)) {
                             val shieldEndTime = ForestUtil.getShieldEndTime(userHomeObj)
                             val bombEndTime = ForestUtil.getBombCardEndTime(userHomeObj)
@@ -1721,7 +1722,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                             val remainingHours = (protectionEndTime - serverTime) / (1000 * 60 * 60)
                             Log.record(
                                 TAG,
-                                "⏭️ 跳过蹲点[$userName]球[$bubbleId]：保护罩覆盖整个成熟期(保护还剩${remainingHours}h，能量${TimeUtil.getCommonDate(produceTime)}成熟)"
+                                "⏭️ 跳过好友蹲点[$userName]球[$bubbleId]：保护罩覆盖整个成熟期(保护还剩${remainingHours}h，能量${TimeUtil.getCommonDate(produceTime)}成熟)"
                             )
                             continue
                         }

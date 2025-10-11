@@ -200,7 +200,19 @@ object EnergyWaitingPersistence {
                 
                 val userHomeObj = org.json.JSONObject(userHomeResponse)
                 
-                // 使用统一的保护罩检查方法
+                // 自己的账号：无论是否有保护罩都要恢复（到时间后直接收取）
+                if (task.isSelf()) {
+                    val success = addTaskCallback(task)
+                    if (success) {
+                        restoredCount++
+                        Log.record(TAG, "  ⭐️ 恢复[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：能量${TimeUtil.getCommonDate(task.produceTime)}成熟，到时间直接收取")
+                    } else {
+                        skippedCount++
+                    }
+                    return@forEach
+                }
+                
+                // 好友账号：如果保护罩覆盖能量成熟期则跳过
                 if (ForestUtil.shouldSkipWaitingDueToProtection(userHomeObj, task.produceTime)) {
                     val protectionEndTime = ForestUtil.getProtectionEndTime(userHomeObj)
                     val timeDifference = protectionEndTime - task.produceTime
@@ -209,15 +221,15 @@ object EnergyWaitingPersistence {
                     
                     Log.record(
                         TAG,
-                        "  ❌ 跳过[${task.userName}]球[${task.bubbleId}]：保护罩覆盖能量成熟期(${hours}小时${minutes}分钟)"
+                        "  ❌ 跳过[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：保护罩覆盖能量成熟期(${hours}小时${minutes}分钟)"
                     )
                     skippedCount++
                 } else {
-                    // 任务有效，重新添加
+                    // 好友任务有效，重新添加
                     val success = addTaskCallback(task)
                     if (success) {
                         restoredCount++
-                        Log.debug(TAG, "  ✅ 恢复[${task.userName}]球[${task.bubbleId}]：能量${TimeUtil.getCommonDate(task.produceTime)}成熟")
+                        Log.record(TAG, "  ✅ 恢复[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：能量${TimeUtil.getCommonDate(task.produceTime)}成熟")
                     } else {
                         skippedCount++
                     }

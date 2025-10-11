@@ -136,6 +136,13 @@ object EnergyWaitingManager {
         fun withRetry(): WaitingTask = this.copy(retryCount = retryCount + 1)
         
         /**
+         * 检查是否是自己的账号
+         */
+        fun isSelf(): Boolean {
+            return userId == fansirsqi.xposed.sesame.util.maps.UserMap.currentUid
+        }
+        
+        /**
          * 检查是否有保护（保护罩或炸弹卡）
          */
         fun hasProtection(currentTime: Long = System.currentTimeMillis()): Boolean {
@@ -147,6 +154,13 @@ object EnergyWaitingManager {
          */
         fun getProtectionEndTime(): Long {
             return maxOf(shieldEndTime, bombEndTime)
+        }
+        
+        /**
+         * 获取用户类型标签（用于日志）
+         */
+        fun getUserTypeTag(): String {
+            return if (isSelf()) "⭐️主号|" else "好友|"
         }
     }
     
@@ -181,6 +195,12 @@ object EnergyWaitingManager {
     
     // 精确时机计算 - 能量成熟或保护结束后立即收取
     private fun calculatePreciseCollectTime(task: WaitingTask): Long {
+        // 自己的账号：不考虑保护罩，直接在能量成熟时收取
+        if (task.isSelf()) {
+            return task.produceTime
+        }
+        
+        // 好友账号：考虑保护罩
         val currentTime = System.currentTimeMillis()
         val protectionEndTime = task.getProtectionEndTime()
         
@@ -239,26 +259,36 @@ object EnergyWaitingManager {
                     Log.debug(TAG, "更新蹲点任务[$taskId]：时间从[${TimeUtil.getCommonDate(existingTask.produceTime)}]更新为[${TimeUtil.getCommonDate(produceTime)}]")
                 }
                 
-                // 智能获取保护时间（提前到时间检查之前）
+                // 检查是否是自己的账号
+                val isSelf = userId == fansirsqi.xposed.sesame.util.maps.UserMap.currentUid
+                
+                // 智能获取保护时间（自己的账号不需要保护时间）
                 var finalShieldEndTime = shieldEndTime
                 var finalBombEndTime = bombEndTime
 
-                if (userHomeObj != null) {
+                if (userHomeObj != null && !isSelf) {
+                    // 只为好友账号获取保护时间
                     finalShieldEndTime = ForestUtil.getShieldEndTime(userHomeObj)
                     finalBombEndTime = ForestUtil.getBombCardEndTime(userHomeObj)
-                    // 智能判断是否应该跳过蹲点
+                    
+                    // 智能判断是否应该跳过蹲点（好友账号）
                     if (ForestUtil.shouldSkipWaitingDueToProtection(userHomeObj, produceTime)) {
                         val protectionEndTime = ForestUtil.getProtectionEndTime(userHomeObj)
                         val timeDifference = protectionEndTime - produceTime
                         val formattedTimeDifference = formatTime(timeDifference)
                         Log.record(
                             TAG,
-                            "智能跳过蹲点：[$userName]的保护罩比能量球晚到期${formattedTimeDifference}，无法收取，已跳过。"
+                            "智能跳过蹲点：[好友|$userName]的保护罩比能量球晚到期${formattedTimeDifference}，无法收取，已跳过。"
                         )
                         // 移除无效的蹲点任务
                         waitingTasks.remove(taskId)
                         return@withLock
                     }
+                } else if (isSelf) {
+                    // 自己的账号：不获取保护时间，直接设置为0
+                    finalShieldEndTime = 0L
+                    finalBombEndTime = 0L
+                    Log.debug(TAG, "⭐️ [主号|$userName]不检查保护罩，到时间直接收取")
                 }
 
                 // 注释：原本的时间有效性检查已删除
@@ -291,18 +321,30 @@ object EnergyWaitingManager {
                 // 添加新任务
                 waitingTasks[taskId] = task
 
-                val protectionEndTime = task.getProtectionEndTime()
-                val protectionStatus = if (protectionEndTime > currentTime) {
-                    " 保护罩到期：" + TimeUtil.getCommonDate(protectionEndTime)
+                val actionText = if (existingTask != null) "更新" else "添加"
+                val waitTimeMinutes = (produceTime - currentTime) / 1000 / 60
+                
+                // 自己的账号：不显示保护罩信息
+                // 好友账号：如果有保护罩，显示保护罩到期时间
+                val protectionStatus = if (!task.isSelf()) {
+                    val protectionEndTime = task.getProtectionEndTime()
+                    if (protectionEndTime > currentTime) {
+                        " 保护罩到期：" + TimeUtil.getCommonDate(protectionEndTime)
+                    } else {
+                        ""
+                    }
                 } else {
                     ""
                 }
-                val actionText = if (existingTask != null) "更新" else "添加"
-                val waitTimeMinutes = (produceTime - currentTime) / 1000 / 60
+                
                 Log.record(
                     TAG,
-                    "${actionText}蹲点：[${fromTag}|${userName}]球[${bubbleId}]在[${TimeUtil.getCommonDate(produceTime)}]成熟(等待${waitTimeMinutes}分钟)${protectionStatus}"
+                    "${actionText}蹲点：[${task.getUserTypeTag()}${fromTag}|${userName}]球[${bubbleId}]在[${TimeUtil.getCommonDate(produceTime)}]成熟(等待${waitTimeMinutes}分钟)${protectionStatus}"
                 )
+                
+                // 保存到持久化存储
+                EnergyWaitingPersistence.saveTasks(waitingTasks)
+                
                 // 启动精确蹲点协程
                 startPreciseWaitingCoroutine(task)
             }
@@ -322,13 +364,18 @@ object EnergyWaitingManager {
                 
                 if (waitTime > 0) {
                     // 需要等待的任务
-                    val protectionInfo = if (task.hasProtection(currentTime)) {
+                    val protectionInfo = if (task.isSelf()) {
+                        // 自己的账号：只显示能量成熟
+                        "能量成熟"
+                    } else if (task.hasProtection(currentTime)) {
+                        // 好友账号：有保护时显示保护结束
                         "保护结束"
                     } else {
+                        // 好友账号：无保护时显示能量成熟
                         "能量成熟"
                     }
                     val waitMinutes = waitTime / 1000 / 60
-                    Log.record(TAG, "🕐 蹲点[${task.userName}]等待${waitMinutes}分钟(${protectionInfo}→${TimeUtil.getCommonDate(preciseCollectTime)})")
+                    Log.record(TAG, "🕐 蹲点[${task.getUserTypeTag()}${task.userName}]等待${waitMinutes}分钟(${protectionInfo}→${TimeUtil.getCommonDate(preciseCollectTime)})")
                     
                     // 分段等待，每30秒检查一次任务有效性
                     val checkInterval = 30000L // 30秒检查一次
@@ -341,32 +388,32 @@ object EnergyWaitingManager {
                         
                         // 检查任务是否仍然有效
                         if (!waitingTasks.containsKey(task.taskId)) {
-                            Log.record(TAG, "⚠️ 蹲点[${task.userName}]已被移除")
+                            Log.record(TAG, "⚠️ 蹲点[${task.getUserTypeTag()}${task.userName}]已被移除")
                             return@launch
                         }
                         
                         // 记录等待进度（调试日志）
                         if (remainingWait > 0) {
-                            Log.debug(TAG, "蹲点任务[${task.userName}]等待中，剩余${remainingWait/1000}秒")
+                            Log.debug(TAG, "蹲点任务[${task.getUserTypeTag()}${task.userName}]等待中，剩余${remainingWait/1000}秒")
                         }
                     }
                     
                     // 等待完成，最终检查任务有效性
                     if (!waitingTasks.containsKey(task.taskId)) {
-                        Log.record(TAG, "⚠️ 蹲点[${task.userName}]等待过程中被移除")
+                        Log.record(TAG, "⚠️ 蹲点[${task.getUserTypeTag()}${task.userName}]等待过程中被移除")
                         return@launch
                     }
                     
-                    Log.record(TAG, "✅ 蹲点[${task.userName}]等待完成，开始收取")
+                    Log.record(TAG, "✅ 蹲点[${task.getUserTypeTag()}${task.userName}]等待完成，开始收取")
                 } else {
                     // 已经到时间的任务，立即执行
                     val overdueMinutes = (-waitTime) / 1000 / 60
                     if (overdueMinutes > 2) {
                         // 超时超过2分钟，记录警告
-                        Log.record(TAG, "⚡ 蹲点[${task.userName}]已超时${overdueMinutes}分钟，立即收取")
+                        Log.record(TAG, "⚡ 蹲点[${task.getUserTypeTag()}${task.userName}]已超时${overdueMinutes}分钟，立即收取")
                     } else {
                         // 刚到时间或刚超时，正常执行
-                        Log.record(TAG, "✅ 蹲点[${task.userName}]时间已到，立即收取")
+                        Log.record(TAG, "✅ 蹲点[${task.getUserTypeTag()}${task.userName}]时间已到，立即收取")
                     }
                 }
                 
@@ -442,9 +489,12 @@ object EnergyWaitingManager {
                 // 验证执行时机是否正确
                 val actualTime = System.currentTimeMillis()
                 val energyTimeRemain = (task.produceTime - actualTime) / 1000
-                val protectionEndTime = task.getProtectionEndTime()
                 val isEnergyMature = task.produceTime <= actualTime
-                val isProtectionEnd = protectionEndTime <= actualTime
+                
+                // 自己的账号：只检查能量成熟时间，不检查保护
+                // 好友账号：检查能量成熟和保护结束
+                val protectionEndTime = if (task.isSelf()) 0L else task.getProtectionEndTime()
+                val isProtectionEnd = if (task.isSelf()) true else protectionEndTime <= actualTime
 
                 if (energyTimeRemain > 300) { // 如果还有超过5分钟才成熟，直接跳过
                     Log.debug(TAG, "⚠️ 能量距离成熟还有${energyTimeRemain}秒，时机过早，跳过本次收取")
@@ -452,35 +502,42 @@ object EnergyWaitingManager {
                 }
                 
                 // 判断是否需要详细日志（未成熟或刚成熟2分钟内）
-                val needDetailLog = !isEnergyMature || !isProtectionEnd || energyTimeRemain > -120
+                val needDetailLog = !isEnergyMature || (!task.isSelf() && !isProtectionEnd) || energyTimeRemain > -120
                 
                 if (needDetailLog) {
                     // 详细调试日志：用于未成熟或刚成熟的任务
-                    Log.record(TAG, "🔍 蹲点任务[${task.userName}]时机检查详情：")
+                    Log.record(TAG, "🔍 蹲点任务[${task.getUserTypeTag()}${task.userName}]时机检查详情：")
                     Log.record(TAG, "  系统当前时间: ${System.currentTimeMillis()} (${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date())})")
                     Log.record(TAG, "  实际执行时间: $actualTime (${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(actualTime))})")
                     Log.record(TAG, "  能量成熟时间: ${task.produceTime} (${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(task.produceTime))})")
-                    Log.record(TAG, "  保护结束时间: $protectionEndTime (${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(protectionEndTime))})")
+                    if (!task.isSelf()) {
+                        Log.record(TAG, "  保护结束时间: $protectionEndTime (${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(protectionEndTime))})")
+                    }
                     Log.record(TAG, "  时间差异: 系统时间与执行时间差${System.currentTimeMillis() - actualTime}ms")
                     Log.record(TAG, "  能量剩余时间: ${energyTimeRemain}秒")
                     Log.record(TAG, "  能量是否成熟: $isEnergyMature")
-                    Log.record(TAG, "  保护是否结束: $isProtectionEnd")
+                    if (!task.isSelf()) {
+                        Log.record(TAG, "  保护是否结束: $isProtectionEnd")
+                    }
                 } else {
                     // 简化日志：用于已成熟超过2分钟的任务
                     val matureTime = (-energyTimeRemain) / 60 // 成熟了多少分钟
-                    Log.record(TAG, "⚡ 蹲点任务[${task.userName}]已成熟${matureTime.toInt()}分钟，直接收取")
+                    Log.record(TAG, "⚡ 蹲点任务[${task.getUserTypeTag()}${task.userName}]已成熟${matureTime.toInt()}分钟，直接收取")
                 }
                 
                 // 最终时机检查
                 if (!isEnergyMature || !isProtectionEnd) {
-                    val additionalWait = max(
-                        protectionEndTime - actualTime,
+                    val additionalWait = if (task.isSelf()) {
+                        // 自己的账号：只等待能量成熟
                         task.produceTime - actualTime
-                    )
+                    } else {
+                        // 好友账号：等待能量成熟和保护结束的较晚时间
+                        max(protectionEndTime - actualTime, task.produceTime - actualTime)
+                    }
                     
                     if (additionalWait in 1..<1800000L) { // 最多额外等待30分钟
                         val waitReason = if (!isEnergyMature) "能量未成熟" else ""
-                        val protectionReason = if (!isProtectionEnd) "保护未结束" else ""
+                        val protectionReason = if (!task.isSelf() && !isProtectionEnd) "保护未结束" else ""
                         val combinedReason = listOf(waitReason, protectionReason).filter { it.isNotEmpty() }.joinToString("且")
                         
                         Log.record(TAG, "⏳ 最终时机检查：等待${additionalWait/1000}秒 ($combinedReason)")
@@ -489,8 +546,12 @@ object EnergyWaitingManager {
                         // 等待后重新检查
                         val newActualTime = System.currentTimeMillis()
                         val newIsEnergyMature = task.produceTime <= newActualTime
-                        val newIsProtectionEnd = task.getProtectionEndTime() <= newActualTime
-                        Log.record(TAG, "⏳ 等待完成：能量成熟[$newIsEnergyMature] 保护结束[$newIsProtectionEnd]")
+                        if (task.isSelf()) {
+                            Log.record(TAG, "⏳ 等待完成：能量成熟[$newIsEnergyMature]")
+                        } else {
+                            val newIsProtectionEnd = task.getProtectionEndTime() <= newActualTime
+                            Log.record(TAG, "⏳ 等待完成：能量成熟[$newIsEnergyMature] 保护结束[$newIsProtectionEnd]")
+                        }
                     } else if (additionalWait > 1800000L) {
                         Log.error(TAG, "⚠️ 等待时间过长(${additionalWait/60000}分钟)，跳过收取")
                         return@withLock
@@ -505,13 +566,14 @@ object EnergyWaitingManager {
                 // 更新用户模式数据
                 UserEnergyPatternManager.updateUserPattern(task.userId, result, executeTime)
                 // 处理结果
+                
                 if (result.success) {
                     if (result.energyCount > 0) {
-                        Log.record(TAG,"✅ 蹲点收取[${task.userName}]成功${result.energyCount}g(耗时${executeTime}ms)")
+                        Log.record(TAG,"✅ 蹲点收取[${task.getUserTypeTag()}${task.userName}]成功${result.energyCount}g(耗时${executeTime}ms)")
                         waitingTasks.remove(task.taskId) // 成功后移除任务
                         EnergyWaitingPersistence.saveTasks(waitingTasks) // 保存更新
                     } else {
-                        Log.record(TAG, "⚠️ 蹲点收取[${task.userName}]异常：返回0能量(${result.message})")
+                        Log.record(TAG, "⚠️ 蹲点收取[${task.getUserTypeTag()}${task.userName}]异常：返回0能量(${result.message})")
                         
                         // 判断是否需要重试
                         if (task.retryCount < task.maxRetries) {
@@ -530,7 +592,7 @@ object EnergyWaitingManager {
                         }
                     }
                 } else {
-                    Log.record(TAG, "❌ 蹲点收取[${task.userName}]失败：${result.message}")
+                    Log.record(TAG, "❌ 蹲点收取[${task.getUserTypeTag()}${task.userName}]失败：${result.message}")
                     
                     // 根据失败原因决定是否重试
                     if (result.hasShield || result.hasBomb) {
@@ -766,17 +828,23 @@ object EnergyWaitingManager {
                 
                 tasksToRevalidate.forEach { task ->
                     try {
-                        // 重新查询用户主页以获取最新的保护罩状态
+                        // 自己的账号：无论是否有保护罩都保留（到时间后直接收取）
+                        if (task.isSelf()) {
+                            Log.record(TAG, "  ⭐️ 保留[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：到时间直接收取")
+                            return@forEach
+                        }
+                        
+                        // 好友账号：重新查询用户主页以获取最新的保护罩状态
                         val userHomeResponse = AntForestRpcCall.queryFriendHomePage(task.userId, task.fromTag)
                         
                         if (userHomeResponse.isNullOrEmpty()) {
-                            Log.debug(TAG, "  验证[${task.userName}]：无法获取主页信息，保留任务")
+                            Log.debug(TAG, "  验证[${task.getUserTypeTag()}${task.userName}]：无法获取主页信息，保留任务")
                             return@forEach
                         }
                         
                         val userHomeObj = JSONObject(userHomeResponse)
                         
-                        // 使用封装的保护罩检查方法
+                        // 好友账号：如果保护罩覆盖能量成熟期则移除
                         if (ForestUtil.shouldSkipWaitingDueToProtection(userHomeObj, task.produceTime)) {
                             val protectionEndTime = ForestUtil.getProtectionEndTime(userHomeObj)
                             val timeDifference = protectionEndTime - task.produceTime
@@ -784,11 +852,11 @@ object EnergyWaitingManager {
                             
                             Log.record(
                                 TAG,
-                                "  ❌ 移除[${task.userName}]球[${task.bubbleId}]：保护罩覆盖能量成熟期($formattedTimeDifference)"
+                                "  ❌ 移除[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：保护罩覆盖能量成熟期($formattedTimeDifference)"
                             )
                             tasksToRemove.add(task.taskId)
                         } else {
-                            Log.debug(TAG, "  ✅ 保留[${task.userName}]球[${task.bubbleId}]：可正常收取")
+                            Log.record(TAG, "  ✅ 保留[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：可正常收取")
                         }
                         
                         // 添加短暂延迟，避免请求过快
