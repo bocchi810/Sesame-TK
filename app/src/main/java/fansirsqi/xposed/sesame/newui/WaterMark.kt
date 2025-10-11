@@ -15,7 +15,7 @@ import kotlin.random.Random
 class WatermarkView(context: Context) : View(context) {
 
     private val paint = Paint().apply {
-        color = "#474747b9".toColorInt()
+        color = "#273f47".toColorInt()
         textSize = 46f
         isAntiAlias = true
         textAlign = Paint.Align.LEFT
@@ -125,7 +125,7 @@ class WatermarkView(context: Context) : View(context) {
         fun install(
             activity: Activity,
             text: String = "",
-            color: Int = "#87474747".toColorInt(),
+            color: Int = "#27273f47".toColorInt(),
             fontSize: Float = 42f,
             density: Float = 0.9f
         ): WatermarkView {
