@@ -28,11 +28,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Member;
 import java.lang.reflect.InvocationTargetException;
 
-import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import fansirsqi.xposed.sesame.BuildConfig;
 import fansirsqi.xposed.sesame.data.Config;
 import fansirsqi.xposed.sesame.data.General;
@@ -63,16 +61,19 @@ import fansirsqi.xposed.sesame.util.TimeUtil;
 import fansirsqi.xposed.sesame.util.maps.UserMap;
 import fansirsqi.xposed.sesame.hook.rpc.debug.DebugRpc;
 import fi.iki.elonen.NanoHTTPD;
+import io.github.libxposed.api.XposedInterface;
+import io.github.libxposed.api.XposedModuleInterface;
 import kotlin.jvm.JvmStatic;
 import lombok.Getter;
 
-public class ApplicationHook implements IXposedHookLoadPackage {
+public class ApplicationHook {
     static final String TAG = ApplicationHook.class.getSimpleName();
+    public XposedInterface xposedInterface = null;
     private ModuleHttpServer httpServer;
     private static final String modelVersion = BuildConfig.VERSION_NAME;
     /**
      * -- GETTER --
-     *  获取闹钟调度器实例 - 供外部访问
+     * 获取闹钟调度器实例 - 供外部访问
      */
     // 统一的闹钟调度器
     @SuppressLint("StaticFieldLeak")
@@ -106,6 +107,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
         return hooked;
     }
 
+
     private static volatile boolean init = false;
     static volatile Calendar dayCalendar;
     @Getter
@@ -116,12 +118,13 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     public static AtomicInteger getReLoginCount() {
         return reLoginCount;
     }
+
     @SuppressLint("StaticFieldLeak")
     static Service service;
     static Handler mainHandler;
     /**
      * -- GETTER --
-     *  获取主任务实例 - 供AlarmScheduler使用
+     * 获取主任务实例 - 供AlarmScheduler使用
      */
     static BaseTask mainTask;
 
@@ -132,6 +135,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     public static BaseTask getMainTask() {
         return mainTask;
     }
+
     static volatile RpcBridge rpcBridge;
     private static final Object rpcBridgeLock = new Object();
     private static RpcVersion rpcVersion;
@@ -139,6 +143,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     public static RpcVersion getRpcVersion() {
         return rpcVersion;
     }
+
     private static PowerManager.WakeLock wakeLock;
 
     public static void setOffline(boolean offline) {
@@ -153,9 +158,9 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     public static volatile long nextExecutionTime = 0;
     private static final long MAX_INACTIVE_TIME = 3600000; // 最大不活动时间：1小时
 
-    private XC_LoadPackage.LoadPackageParam modelLoadPackageParam;
+    private static XposedModuleInterface.PackageLoadedParam modelLoadPackageParam;
 
-    private static XC_LoadPackage.LoadPackageParam appLloadPackageParam;
+    private static XposedModuleInterface.PackageLoadedParam appLloadPackageParam;
 
     static {
         dayCalendar = Calendar.getInstance();
@@ -176,8 +181,8 @@ public class ApplicationHook implements IXposedHookLoadPackage {
         deoptimizeMethod = m;
     }
 
-    static void deoptimizeMethod(Class < ? > c) throws InvocationTargetException, IllegalAccessException {
-        for (Method m: c.getDeclaredMethods()) {
+    static void deoptimizeMethod(Class<?> c) throws InvocationTargetException, IllegalAccessException {
+        for (Method m : c.getDeclaredMethods()) {
             if (deoptimizeMethod != null && m.getName().equals("makeApplicationInner")) {
                 deoptimizeMethod.invoke(null, m);
                 if (BuildConfig.DEBUG)
@@ -196,7 +201,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
             // 检查长时间未执行的情况
             checkInactiveTime();
             int checkInterval = BaseModel.getCheckInterval().getValue();
-            List < String > execAtTimeList = BaseModel.getExecAtTimeList().getValue();
+            List<String> execAtTimeList = BaseModel.getExecAtTimeList().getValue();
             if (execAtTimeList != null && execAtTimeList.contains("-1")) {
                 Log.record(TAG, "定时执行未开启");
                 return;
@@ -209,7 +214,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                 if (execAtTimeList != null) {
                     Calendar lastExecTimeCalendar = TimeUtil.getCalendarByTimeMillis(lastExecTime);
                     Calendar nextExecTimeCalendar = TimeUtil.getCalendarByTimeMillis(lastExecTime + checkInterval);
-                    for (String execAtTime: execAtTimeList) {
+                    for (String execAtTime : execAtTimeList) {
                         Calendar execAtTimeCalendar = TimeUtil.getTodayCalendarByTimeStr(execAtTime);
                         if (execAtTimeCalendar != null && lastExecTimeCalendar.compareTo(execAtTimeCalendar) < 0 && nextExecTimeCalendar.compareTo(execAtTimeCalendar) > 0) {
                             Log.record(TAG, "设置定时执行:" + execAtTime);
@@ -250,30 +255,41 @@ public class ApplicationHook implements IXposedHookLoadPackage {
         }
     }
 
-    @Override
-    public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
-        if (General.MODULE_PACKAGE_NAME.equals(loadPackageParam.packageName)) {
+    public void loadModelPackage(XposedModuleInterface.PackageLoadedParam lpparam) {
+        if (General.MODULE_PACKAGE_NAME.equals(lpparam.getPackageName())) {
+//            try {
+//                @SuppressLint("PrivateApi") Class<?> loadedApkClass = lpparam.getClassLoader().loadClass("android.app.LoadedApk");
+//                deoptimizeMethod(loadedApkClass);
+//            } catch (Throwable t) {
+//                Log.runtime(TAG, "deoptimize makeApplicationInner err:");
+//                Log.printStackTrace(TAG, t);
+//            }
+//            不知道为什么hook不到自身
             try {
-                Class < ? > applicationClass = loadPackageParam.classLoader.loadClass("android.app.Application");
+                Class<?> applicationClass = lpparam.getClassLoader().loadClass("android.app.Application");
                 XposedHelpers.findAndHookMethod(applicationClass, "onCreate", new XC_MethodHook() {
                     @Override
-                    protected void afterHookedMethod(MethodHookParam param) {
+                    protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) {
                         moduleContext = (Context) param.thisObject;
                         // 可以在这里调用其他需要 Context 的 Hook 方法
-                        HookUtil.INSTANCE.hookActive(loadPackageParam);
+                        HookUtil.INSTANCE.hookActive(lpparam);
                     }
                 });
             } catch (Exception e) {
                 Log.printStackTrace(e);
             }
-        } else if (General.PACKAGE_NAME.equals(loadPackageParam.packageName) && General.PACKAGE_NAME.equals(loadPackageParam.processName)) {
+        }
+    }
+
+    public void loadPackage(XposedModuleInterface.PackageLoadedParam lpparam) {
+        if (General.PACKAGE_NAME.equals(lpparam.getPackageName())) {
             try {
                 if (hooked) return;
-                appLloadPackageParam = loadPackageParam;
-                classLoader = appLloadPackageParam.classLoader;
+                appLloadPackageParam = lpparam;
+                classLoader = appLloadPackageParam.getClassLoader();
                 // 在Hook Application.attach 之前，先 deoptimize LoadedApk.makeApplicationInner
                 try {
-                    @SuppressLint("PrivateApi") Class < ? > loadedApkClass = classLoader.loadClass("android.app.LoadedApk");
+                    @SuppressLint("PrivateApi") Class<?> loadedApkClass = classLoader.loadClass("android.app.LoadedApk");
                     deoptimizeMethod(loadedApkClass);
                 } catch (Throwable t) {
                     Log.runtime(TAG, "deoptimize makeApplicationInner err:");
@@ -297,7 +313,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                         Log.runtime(TAG, "handleLoadPackage alipayVersion: " + alipayVersion.getVersionString());
                         loadNativeLibs(appContext, AssetUtil.INSTANCE.getCheckerDestFile());
                         loadNativeLibs(appContext, AssetUtil.INSTANCE.getDexkitDestFile());
-                        HookUtil.INSTANCE.fuckAccounLimit(loadPackageParam);
+                        HookUtil.INSTANCE.fuckAccounLimit(lpparam);
                         if (BuildConfig.DEBUG) {
                             try {
                                 Log.runtime(TAG, "start service for debug rpc");
@@ -384,7 +400,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                                     Detector.INSTANCE.dangerous(appContext);
                                     return;
                                 }
-                                String apkPath = loadPackageParam.appInfo.sourceDir;
+                                String apkPath = lpparam.getApplicationInfo().sourceDir;
                                 try (DexKitBridge ignored = DexKitBridge.create(apkPath)) {
                                     // Other use cases
                                     Log.runtime(TAG, "hook dexkit successfully");
@@ -437,7 +453,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                                         }
 
                                         String currentUid = UserMap.getCurrentUid();
-                                        String targetUid = HookUtil.INSTANCE.getUserId(appLloadPackageParam.classLoader);
+                                        String targetUid = HookUtil.INSTANCE.getUserId(appLloadPackageParam.getClassLoader());
                                         if (targetUid == null || !targetUid.equals(currentUid)) {
                                             Log.record(TAG, "用户切换或为空，重新登录");
                                             reLogin();
@@ -489,10 +505,10 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                 Log.printStackTrace(TAG, t);
             }
 
-            HookUtil.INSTANCE.hookOtherService(loadPackageParam);
+            HookUtil.INSTANCE.hookOtherService(lpparam);
 
             hooked = true;
-            Log.runtime(TAG, "load success: " + loadPackageParam.packageName);
+            Log.runtime(TAG, "load success: " + lpparam.getPackageName());
         }
     }
 
@@ -610,7 +626,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
             }
 
             if (force) {
-                String userId = HookUtil.INSTANCE.getUserId(appLloadPackageParam.classLoader);
+                String userId = HookUtil.INSTANCE.getUserId(appLloadPackageParam.getClassLoader());
                 if (userId == null) {
                     Log.record(TAG, "initHandler: 用户未登录");
                     Toast.show("用户未登录");
@@ -893,7 +909,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     public static Object getMicroApplicationContext() {
         if (microApplicationContextObject == null) {
             try {
-                Class < ? > alipayApplicationClass = XposedHelpers.findClass(
+                Class<?> alipayApplicationClass = XposedHelpers.findClass(
                         "com.alipay.mobile.framework.AlipayApplication", classLoader
                 );
                 Object alipayApplicationInstance = XposedHelpers.callStaticMethod(
