@@ -3,11 +3,14 @@ package fansirsqi.xposed.sesame.data
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import de.robv.android.xposed.XposedBridge
 import fansirsqi.xposed.sesame.BuildConfig
 import fansirsqi.xposed.sesame.R
 import fansirsqi.xposed.sesame.newutil.MMKVUtil
 import fansirsqi.xposed.sesame.util.FansirsqiUtil.getFolderList
 import fansirsqi.xposed.sesame.util.Files
+import io.github.libxposed.service.XposedService
+import io.github.libxposed.service.XposedServiceHelper
 import java.util.UUID
 
 
@@ -23,6 +26,9 @@ object ViewAppInfo {
     var veriftag: Boolean = false
 
     var verifuids: List<String> = listOf()
+
+    private var _service: XposedService? = null
+    val service get() = _service
 
     @SuppressLint("HardwareIds")
 
@@ -75,5 +81,16 @@ object ViewAppInfo {
                 Log.e(TAG, "init: ", e)
             }
         }
+        XposedServiceHelper.registerListener(object : XposedServiceHelper.OnServiceListener {
+            override fun onServiceBind(service: XposedService) {
+                XposedBridge.log("XposedScope onServiceBind: $service")
+                _service = service
+                XposedBridge.log("Framework: ${service.frameworkName} ${service.frameworkVersion}")
+                XposedBridge.log("API: ${service.apiVersion} FrameworkVersion${service.frameworkVersionCode}")
+            }
+            override fun onServiceDied(service: XposedService) {
+                XposedBridge.log("Service died: ${service.frameworkName}")
+            }
+        })
     }
 }
