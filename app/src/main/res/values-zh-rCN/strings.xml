@@ -202,5 +202,6 @@
     <string name="clear_photo">清空光盘行动图片💿</string>
     <string name="all_log_file">全部日志</string>
     <string name="error_log_file">异常日志</string>
+    <string name="xposed_description">今夜月明人尽望，不知秋思落谁家。</string>
 
 </resources>
