@@ -365,22 +365,64 @@ object EnergyWaitingManager {
                 if (waitTime > 0) {
                     // 需要等待的任务
                     val protectionInfo = if (task.isSelf()) {
-                        // 自己的账号：只显示能量成熟
                         "能量成熟"
                     } else if (task.hasProtection(currentTime)) {
-                        // 好友账号：有保护时显示保护结束
                         "保护结束"
                     } else {
-                        // 好友账号：无保护时显示能量成熟
                         "能量成熟"
                     }
                     val waitMinutes = waitTime / 1000 / 60
                     Log.record(TAG, "🕐 蹲点[${task.getUserTypeTag()}${task.userName}]等待${waitMinutes}分钟(${protectionInfo}→${TimeUtil.getCommonDate(preciseCollectTime)})")
                     
-                    // 分段等待，每30秒检查一次任务有效性
-                    val checkInterval = 30000L // 30秒检查一次
+                    // 倒计时前2分钟验证策略
+                    val twoMinutes = 2 * 60 * 1000L
                     var remainingWait = waitTime
                     
+                    // 阶段1：如果等待时间>2分钟且是好友任务，先等到倒计时2分钟时验证
+                    if (waitTime > twoMinutes && !task.isSelf()) {
+                        val waitBeforeValidation = waitTime - twoMinutes
+                        Log.debug(TAG, "蹲点[${task.getUserTypeTag()}${task.userName}]将在${(waitBeforeValidation/1000/60).toInt()}分钟后验证")
+                        delay(waitBeforeValidation)
+                        
+                        // 检查任务是否被移除
+                        if (!waitingTasks.containsKey(task.taskId)) {
+                            Log.record(TAG, "⚠️ 蹲点[${task.getUserTypeTag()}${task.userName}]已被移除")
+                            return@launch
+                        }
+                        
+                        // 倒计时2分钟验证：查询好友保护罩状态
+                        Log.record(TAG, "🔍 倒计时2分钟验证[${task.getUserTypeTag()}${task.userName}]保护罩状态...")
+                        try {
+                            val userHomeResponse = AntForestRpcCall.queryFriendHomePage(task.userId, task.fromTag)
+                            if (!userHomeResponse.isNullOrEmpty()) {
+                                val userHomeObj = JSONObject(userHomeResponse)
+                                if (ForestUtil.shouldSkipWaitingDueToProtection(userHomeObj, task.produceTime)) {
+                                    // 有保护罩覆盖，取消蹲点
+                                    val shieldEnd = ForestUtil.getShieldEndTime(userHomeObj)
+                                    val bombEnd = ForestUtil.getBombCardEndTime(userHomeObj)
+                                    val protectionEnd = maxOf(shieldEnd, bombEnd)
+                                    val coverMinutes = (protectionEnd - task.produceTime) / 1000 / 60
+                                    Log.record(TAG, "❌ 验证失败[${task.getUserTypeTag()}${task.userName}]球[${task.bubbleId}]：保护罩覆盖${coverMinutes}分钟，取消蹲点")
+                                    waitingTasks.remove(task.taskId)
+                                    EnergyWaitingPersistence.saveTasks(waitingTasks)
+                                    return@launch
+                                } else {
+                                    // 无保护罩，继续等待
+                                    Log.record(TAG, "✅ 验证通过[${task.getUserTypeTag()}${task.userName}]：无保护罩，继续等待2分钟")
+                                }
+                            } else {
+                                Log.debug(TAG, "验证[${task.getUserTypeTag()}${task.userName}]：无法获取主页信息，继续执行")
+                            }
+                        } catch (e: Exception) {
+                            Log.debug(TAG, "验证[${task.getUserTypeTag()}${task.userName}]出错: ${e.message}，继续执行")
+                        }
+                        
+                        // 更新剩余等待时间为2分钟
+                        remainingWait = twoMinutes
+                    }
+                    
+                    // 阶段2：最后阶段等待（主号全程或好友验证后的2分钟）
+                    val checkInterval = 30000L // 30秒检查一次
                     while (remainingWait > 0 && isActive) {
                         val currentWait = minOf(remainingWait, checkInterval)
                         delay(currentWait)
@@ -392,9 +434,9 @@ object EnergyWaitingManager {
                             return@launch
                         }
                         
-                        // 记录等待进度（调试日志）
-                        if (remainingWait > 0) {
-                            Log.debug(TAG, "蹲点任务[${task.getUserTypeTag()}${task.userName}]等待中，剩余${remainingWait/1000}秒")
+                        // 仅在最后1分钟显示倒计时
+                        if (remainingWait > 0 && remainingWait <= 60000L) {
+                            Log.debug(TAG, "蹲点[${task.getUserTypeTag()}${task.userName}]倒计时${remainingWait/1000}秒")
                         }
                     }
                     
@@ -707,30 +749,20 @@ object EnergyWaitingManager {
                     Log.debug(TAG, "定期清理检查：无过期任务")
                 }
                 
-                // 3. 定期重新验证任务有效性（每30次清理执行一次，即15分钟验证一次，或手动启用）
-                cleanupCounter++
-                if (enableRevalidation || cleanupCounter >= 30) {
+                // 3. 手动触发全面验证（仅在手动启用时执行）
+                // 注意：已改为倒计时前2分钟自动验证，不再需要定期验证
+                if (enableRevalidation) {
                     if (waitingTasks.isNotEmpty()) {
-                        Log.record(TAG, "🔍 定期验证：开始检查蹲点任务保护罩状态...")
+                        Log.record(TAG, "🔍 手动全面验证：开始检查所有蹲点任务保护罩状态...")
                         revalidateAllWaitingTasks()
                     }
-                    cleanupCounter = 0
                 }
                 
-                // 记录当前活跃任务状态（每4次清理输出一次，即2分钟一次）
-                statusLogCounter++
-                if (statusLogCounter >= 4) {
-                    if (waitingTasks.isNotEmpty()) {
-                        val sortedTasks = waitingTasks.values.sortedBy { it.produceTime }
-                        val nearestTask = sortedTasks.firstOrNull()
-                        if (nearestTask != null) {
-                            val timeToNearest = (nearestTask.produceTime - currentTime) / 1000 / 60
-                            Log.record(TAG, "📋 活跃蹲点${waitingTasks.size}个，最近[${nearestTask.userName}]${timeToNearest}分钟后")
-                        }
-                    } else {
-                        Log.debug(TAG, "当前无活跃蹲点任务")
-                    }
-                    statusLogCounter = 0
+                // 减少日志输出：仅在调试模式下记录状态
+                if (waitingTasks.isNotEmpty()) {
+                    Log.debug(TAG, "定期清理完成，当前活跃蹲点${waitingTasks.size}个")
+                } else {
+                    Log.debug(TAG, "定期清理完成，当前无活跃蹲点任务")
                 }
             }
         }
