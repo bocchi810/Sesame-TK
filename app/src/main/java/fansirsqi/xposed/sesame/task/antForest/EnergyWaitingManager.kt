@@ -666,6 +666,7 @@ object EnergyWaitingManager {
      * @param enableRevalidation 是否启用重新验证（默认每5次清理执行一次）
      */
     private var cleanupCounter = 0
+    private var statusLogCounter = 0 // 状态日志计数器
     
     fun cleanExpiredTasks(enableRevalidation: Boolean = false) {
         managerScope.launch {
@@ -706,9 +707,9 @@ object EnergyWaitingManager {
                     Log.debug(TAG, "定期清理检查：无过期任务")
                 }
                 
-                // 3. 定期重新验证任务有效性（每5次清理执行一次，或手动启用）
+                // 3. 定期重新验证任务有效性（每30次清理执行一次，即15分钟验证一次，或手动启用）
                 cleanupCounter++
-                if (enableRevalidation || cleanupCounter >= 5) {
+                if (enableRevalidation || cleanupCounter >= 30) {
                     if (waitingTasks.isNotEmpty()) {
                         Log.record(TAG, "🔍 定期验证：开始检查蹲点任务保护罩状态...")
                         revalidateAllWaitingTasks()
@@ -716,16 +717,20 @@ object EnergyWaitingManager {
                     cleanupCounter = 0
                 }
                 
-                // 记录当前活跃任务状态（简化版）
-                if (waitingTasks.isNotEmpty()) {
-                    val sortedTasks = waitingTasks.values.sortedBy { it.produceTime }
-                    val nearestTask = sortedTasks.firstOrNull()
-                    if (nearestTask != null) {
-                        val timeToNearest = (nearestTask.produceTime - currentTime) / 1000 / 60
-                        Log.record(TAG, "📋 活跃蹲点${waitingTasks.size}个，最近[${nearestTask.userName}]${timeToNearest}分钟后")
+                // 记录当前活跃任务状态（每4次清理输出一次，即2分钟一次）
+                statusLogCounter++
+                if (statusLogCounter >= 4) {
+                    if (waitingTasks.isNotEmpty()) {
+                        val sortedTasks = waitingTasks.values.sortedBy { it.produceTime }
+                        val nearestTask = sortedTasks.firstOrNull()
+                        if (nearestTask != null) {
+                            val timeToNearest = (nearestTask.produceTime - currentTime) / 1000 / 60
+                            Log.record(TAG, "📋 活跃蹲点${waitingTasks.size}个，最近[${nearestTask.userName}]${timeToNearest}分钟后")
+                        }
+                    } else {
+                        Log.debug(TAG, "当前无活跃蹲点任务")
                     }
-                } else {
-                    Log.debug(TAG, "当前无活跃蹲点任务")
+                    statusLogCounter = 0
                 }
             }
         }
