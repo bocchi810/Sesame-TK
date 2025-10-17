@@ -20,6 +20,8 @@ object General {
      */
     const val CURRENT_USING_ACTIVITY: String = "com.eg.android.AlipayGphone.AlipayLogin"
 
+    const val CURRENT_USING_SCHEME_ACTIVITY = "com.alipay.mobile.framework.service.common.SchemeStartActivity"
+
     /**
      * JSON对象的类名。
      */

@@ -279,14 +279,12 @@ public class ApplicationHook {
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     mainHandler = new Handler(Looper.getMainLooper());
                     appContext = (Context) param.args[0];
-
                     registerBroadcastReceiver(appContext);
                     // 设置AlarmSchedulerManager依赖项
                     alarmManager.setMainHandler(mainHandler);
                     alarmManager.setAppContext(appContext);
                     // 初始化闹钟调度器
                     alarmManager.initializeAlarmScheduler(appContext);
-
                     // 初始化支付宝组件帮助类（用于任务执行前唤醒）
                     alipayComponentHelper = new AlipayComponentHelper(appContext);
                     alipayComponentHelper.setupKeepAlive();
@@ -783,10 +781,8 @@ public class ApplicationHook {
         if (alipayComponentHelper != null) {
             try {
                 // 【唤醒方式选择】
-                
                 // 方式1: 完整唤醒（启动所有4个服务，包括日志同步、计步统计等）
                 alipayComponentHelper.wakeupAlipay();
-                
                 // 方式2: 精简唤醒（仅流量监控，跳过日志同步和计步统计）⭐ 推荐
                 alipayComponentHelper.wakeupAlipayLite();
             } catch (Exception e) {
@@ -977,12 +973,10 @@ public class ApplicationHook {
                     } else {
                         delayMillis = Math.max(BaseModel.getCheckInterval().getValue(), 180_000);
                     }
-
                     // 使用统一的闹钟调度器
                     alarmManager.scheduleDelayedExecution(delayMillis);
-
                     Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setClassName(General.PACKAGE_NAME, General.CURRENT_USING_ACTIVITY);
+                    intent.setClassName(General.PACKAGE_NAME, General.CURRENT_USING_SCHEME_ACTIVITY);
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     offline = true;
                     appContext.startActivity(intent);
