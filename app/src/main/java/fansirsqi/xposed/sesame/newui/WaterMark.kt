@@ -2,6 +2,7 @@ package fansirsqi.xposed.sesame.newui
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
@@ -15,23 +16,22 @@ import kotlin.random.Random
 class WatermarkView(context: Context) : View(context) {
 
     private val paint = Paint().apply {
-        color = "#273f47".toColorInt()
-        textSize = 46f
         isAntiAlias = true
         textAlign = Paint.Align.LEFT
     }
+
+    // 定义白天和黑夜的颜色
+    private var dayColor = "#3e273f47".toColorInt()   // 深灰蓝（适合亮色背景）
+    private var nightColor = "#808a9a9e".toColorInt() // 浅灰（适合暗色背景）
 
     private var textLines: List<String> = emptyList()
 
     var watermarkText: String? = null
         set(_) {
-            // 固定前缀
             val prefixLines = mutableListOf(
                 "免费模块仅供学习,勿在国内平台传播!!"
             )
-            // 当前时间
             val suffix = "${TimeUtil.getFormatDateTime()}"
-            // UID 列表，如果为空就显示“未载入账号”，否则带索引显示
             val uidLines = if (verifuids.isEmpty()) {
                 listOf(
                     "未载入账号",
@@ -46,11 +46,11 @@ class WatermarkView(context: Context) : View(context) {
             val combinedLines = prefixLines + uidLines + suffix
             field = combinedLines.joinToString("\n")
             textLines = combinedLines
+            updateTextColor() // 根据当前模式更新颜色
             invalidate()
         }
 
-
-    /** 控制整体水印稀疏度（越大越密集，越小越稀疏） */
+    /** 控制整体水印稀疏度 */
     private var densityFactor: Float = 0.1f
 
     /** 旋转角度 */
@@ -72,14 +72,23 @@ class WatermarkView(context: Context) : View(context) {
         invalidate()
     }
 
-    /** 调整整体密度，默认 1f = 正常，0.5f = 稀疏，2f = 更密 */
+    fun setDayNightColors(day: Int, night: Int) {
+        dayColor = day
+        nightColor = night
+        updateTextColor()
+    }
+
     fun setDensity(density: Float = 1f) {
-        densityFactor = density.coerceAtLeast(0.1f) // 防止过稀
+        densityFactor = density.coerceAtLeast(0.1f)
         invalidate()
     }
 
+    private fun updateTextColor() {
+        val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        paint.color = if (isNight) nightColor else dayColor
+    }
 
-    private val offsetX = Random.nextInt(-200, 200) // 根据需要调整最大偏移量
+    private val offsetX = Random.nextInt(-200, 200)
     private val offsetY = Random.nextInt(-200, 200)
 
     override fun onDraw(canvas: Canvas) {
@@ -116,8 +125,13 @@ class WatermarkView(context: Context) : View(context) {
         }
     }
 
-
-
+    /**
+     * 刷新水印：重新检测日夜模式并重绘
+     */
+    fun refresh() {
+        updateTextColor()
+        invalidate()
+    }
 
     companion object {
         @JvmStatic
@@ -125,13 +139,17 @@ class WatermarkView(context: Context) : View(context) {
         fun install(
             activity: Activity,
             text: String = "",
-            color: Int = "#27273f47".toColorInt(),
+            dayColor: Int = "#3e273f47".toColorInt(),   // 明确命名：白天色
+            nightColor: Int = "#7e8a9a9e".toColorInt(), // 明确命名：夜色
             fontSize: Float = 42f,
             density: Float = 0.9f
         ): WatermarkView {
             val watermarkView = WatermarkView(activity).apply {
+                // 先设置日夜颜色（必须在 watermarkText 之前！）
+                setDayNightColors(day = dayColor, night = nightColor)
+                // 再设置文本，内部会调用 updateTextColor()
                 watermarkText = text
-                setWatermarkStyle(color, fontSize)
+                paint.textSize = fontSize
                 setDensity(density)
             }
             val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
