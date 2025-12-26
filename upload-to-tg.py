@@ -54,17 +54,16 @@ See commit detail [here](https://github.com/{COMMIT_AUTHOR_GITHUB}/Sesame-TK/com
 # 异步上传文件
 # -------------------
 async def main():
-    client = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+    client = TelegramClient('bot_session', API_ID, API_HASH)
+    await client.start(bot_token=BOT_TOKEN)
 
     if not apk_paths:
         print("No APK files found to upload.")
         return
 
-    # 先发送消息
     message_text = generate_message(file_names)
     await client.send_message(CHAT_ID, message_text, parse_mode='md')
 
-    # 上传 APK 文件
     for path in apk_paths:
         print(f"Uploading {path} ...")
         await client.send_file(CHAT_ID, path)
@@ -72,6 +71,7 @@ async def main():
 
     await client.disconnect()
     print("All files uploaded successfully!")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
