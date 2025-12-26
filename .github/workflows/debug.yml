@@ -69,7 +69,7 @@ jobs:
 
       # 推送文件到 Telegram
       - name: Send multiple files to Telegram
-        uses: appleboy/telegram-action@v1
+        uses: appleboy/telegram-action@v1.0.1
         with:
           to: ${{ secrets.TG_CHAT_ID }}
           token: ${{ secrets.TG_BOT_TOKEN }}
