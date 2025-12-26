@@ -8,7 +8,12 @@ from telethon import TelegramClient
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")  # @channel 或 chat_id
+chat_id_raw = os.environ.get("CHAT_ID")
+
+try:
+    CHAT_ID = int(chat_id_raw)
+except (ValueError, TypeError):
+    CHAT_ID = chat_id_raw
 
 # GitHub Actions 传入参数
 TAG = os.environ.get("TAG")
@@ -62,6 +67,8 @@ async def main():
         return
 
     message_text = generate_message(file_names)
+    
+    print(f"Sending message to CHAT_ID: {CHAT_ID} (Type: {type(CHAT_ID)})")
     await client.send_message(CHAT_ID, message_text, parse_mode='md')
 
     for path in apk_paths:
