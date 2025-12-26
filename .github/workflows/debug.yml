@@ -85,9 +85,10 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           TAG: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          COMMIT_AUTHOR_NAME: ${{ github.event.head_commit.author.name }}
-          COMMIT_AUTHOR_GITHUB: ${{ github.event.head_commit.author.username }}
+          # 修复点：确保整行没有多余空格，且使用引号包裹整个表达式
+          COMMIT_MESSAGE: "${{ github.event.head_commit.message || format('Tag: {0}', github.ref_name) }}"
+          COMMIT_AUTHOR_NAME: ${{ github.actor }}
+          COMMIT_AUTHOR_GITHUB: ${{ github.actor }}
           ARM64_APK: ${{ steps.locate_apks.outputs.arm64_apk }}
           ARMV7_APK: ${{ steps.locate_apks.outputs.armv7_apk }}
           X86_APK: ${{ steps.locate_apks.outputs.x86_apk }}
