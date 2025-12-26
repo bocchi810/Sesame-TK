@@ -67,7 +67,33 @@ jobs:
           echo "x86_64_apk=$x86_64_apk" >> $GITHUB_OUTPUT
           echo "universal_apk=$universal_apk" >> $GITHUB_OUTPUT
 
-      # 直接上传 Artifacts，不再签名，不再发 TG
+      # 推送文件到 Telegram
+      - name: Send multiple files to Telegram
+        uses: appleboy/telegram-action@v1
+        with:
+          to: ${{ secrets.TG_CHAT_ID }}
+          token: ${{ secrets.TG_BOT_TOKEN }}
+          message: |
+            🎉 New Test Version Build Success! v0.2.8.rc3095
+            Target by [${{ github.actor }}](https://github.com/${{ github.actor }})
+            ✨ What's Changed:
+
+            • 修复一些bug (18bb65a)
+            
+            - arm64-v8a: 适用于64位ARM设备 (主流新手机)
+            - armeabi-v7a: 适用于32位ARM设备 (旧款手机)
+            - x86 / x86_64: 主要用于PC上的安卓模拟器
+            - universal: 通用版 (不确定时使用，体积较大)
+            参考配置文件：[魔改版-config_v2.json](https://t.me/Sesame_TK_Channel/306)
+            See commit detail [here](https://github.com/Fansirsqi/Sesame-TK/commit/${{ github.sha }})
+          document: |
+            ${{ steps.locate_apks.outputs.arm64_apk }}
+            ${{ steps.locate_apks.outputs.armv7_apk }}
+            ${{ steps.locate_apks.outputs.x86_apk }}
+            ${{ steps.locate_apks.outputs.x86_64_apk }}
+            ${{ steps.locate_apks.outputs.universal_apk }}
+            
+      # 直接上传 Artifacts，不再签名
 
       - name: 🚀 Upload Debug APK - arm64-v8a
         if: steps.locate_apks.outputs.arm64_apk != ''
