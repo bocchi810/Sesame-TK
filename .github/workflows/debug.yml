@@ -73,6 +73,7 @@ jobs:
         with:
           to: ${{ secrets.TG_CHAT_ID }}
           token: ${{ secrets.TG_BOT_TOKEN }}
+          format: markdown
           message: |
             🎉 New Test Version Build Success! v0.2.8.rc3095
             Target by [${{ github.actor }}](https://github.com/${{ github.actor }})
@@ -86,7 +87,7 @@ jobs:
             - universal: 通用版 (不确定时使用，体积较大)
             参考配置文件：[魔改版-config_v2.json](https://t.me/Sesame_TK_Channel/306)
             See commit detail [here](https://github.com/Fansirsqi/Sesame-TK/commit/${{ github.sha }})
-          document: |
+          message_file: |
             ${{ steps.locate_apks.outputs.arm64_apk }}
             ${{ steps.locate_apks.outputs.armv7_apk }}
             ${{ steps.locate_apks.outputs.x86_apk }}
