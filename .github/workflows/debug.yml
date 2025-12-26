@@ -13,10 +13,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+          
       - name: ⏰ Set Timezone to Asia/Shanghai
         run: |
           sudo timedatectl set-timezone Asia/Shanghai
           echo "Current time: $(date)"
+
+      - name: Install dependencies
+        run: pip install telethon
+        
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
 
       - name: 👨🏻‍💻 Checkout
         uses: actions/checkout@v4
@@ -68,31 +77,23 @@ jobs:
           echo "universal_apk=$universal_apk" >> $GITHUB_OUTPUT
 
       # 推送文件到 Telegram
-      - name: ✈️ Send multiple files to Telegram
-        uses: appleboy/telegram-action@v1.0.1
-        with:
-          to: ${{ secrets.TG_CHAT_ID }}
-          token: ${{ secrets.TG_BOT_TOKEN }}
-          format: markdown
-          message: |
-            🎉 New Test Version Build Success! v0.2.8.rc3095
-            Target by [${{ github.actor }}](https://github.com/${{ github.actor }})
-            ✨ What's Changed:
-
-            ${{ github.event.head_commit.message }}
-            
-            - arm64-v8a: 适用于64位ARM设备 (主流新手机)
-            - armeabi-v7a: 适用于32位ARM设备 (旧款手机)
-            - x86 / x86_64: 主要用于PC上的安卓模拟器
-            - universal: 通用版 (不确定时使用，体积较大)
-            参考配置文件：[魔改版-config_v2.json](https://t.me/Sesame_TK_Channel/306)
-            See commit detail [here](https://github.com/Fansirsqi/Sesame-TK/commit/${{ github.sha }})
-          message_file: |
-            ${{ steps.locate_apks.outputs.arm64_apk }}
-            ${{ steps.locate_apks.outputs.armv7_apk }}
-            ${{ steps.locate_apks.outputs.x86_apk }}
-            ${{ steps.locate_apks.outputs.x86_64_apk }}
-            ${{ steps.locate_apks.outputs.universal_apk }}
+      - name: Upload APK to Telegram
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          TAG: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR_NAME: ${{ github.event.head_commit.author.name }}
+          COMMIT_AUTHOR_GITHUB: ${{ github.event.head_commit.author.username }}
+          ARM64_APK: ${{ steps.locate_apks.outputs.arm64_apk }}
+          ARMV7_APK: ${{ steps.locate_apks.outputs.armv7_apk }}
+          X86_APK: ${{ steps.locate_apks.outputs.x86_apk }}
+          X86_64_APK: ${{ steps.locate_apks.outputs.x86_64_apk }}
+          UNIVERSAL_APK: ${{ steps.locate_apks.outputs.universal_apk }}
+        run: python upload-to-tg.py
             
       # 直接上传 Artifacts，不再签名
 
