@@ -68,7 +68,7 @@ jobs:
           echo "universal_apk=$universal_apk" >> $GITHUB_OUTPUT
 
       # 推送文件到 Telegram
-      - name: Send multiple files to Telegram
+      - name: ✈️ Send multiple files to Telegram
         uses: appleboy/telegram-action@v1.0.1
         with:
           to: ${{ secrets.TG_CHAT_ID }}
@@ -78,7 +78,7 @@ jobs:
             Target by [${{ github.actor }}](https://github.com/${{ github.actor }})
             ✨ What's Changed:
 
-            • 修复一些bug (18bb65a)
+            ${{ github.event.head_commit.message }}
             
             - arm64-v8a: 适用于64位ARM设备 (主流新手机)
             - armeabi-v7a: 适用于32位ARM设备 (旧款手机)
